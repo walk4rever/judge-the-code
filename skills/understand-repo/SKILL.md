@@ -8,6 +8,7 @@ description: >-
   或说了"帮我看看这个项目"、"分析这个仓库"、"这个项目怎么工作的"。
   DO NOT TRIGGER when: 用户只想修改或调试某个具体文件。
 origin: learn-from-github
+version: 1.1.0
 ---
 
 # Understand Repo — GitHub 项目理解向导
@@ -29,11 +30,14 @@ origin: learn-from-github
 
 ---
 
-## Token 使用原则（所有 Agent 必须遵守）
+## Token 使用原则
 
 > **核心策略：用结构推断意图，而不是读源码找答案。**
+>
+> ⚠️ **作用域**：以下规则**仅适用于 Phase 1**（初始分析阶段）。
+> Phase 3 导览模式中可以读取源码文件，但遵循"每步 1 文件、最多 150 行"的独立约束。
 
-每个 Agent 必须严格遵守以下规则：
+**Phase 1 的所有 Agent 必须严格遵守以下规则：**
 
 1. **Glob 优先于 Read**：获取目录结构时只用 Glob 拿文件路径列表，不读文件内容
 2. **Grep 优先于 Read**：需要找特定信息时用 Grep 定向搜索，而不是把整个文件读进来
@@ -63,31 +67,42 @@ origin: learn-from-github
 
    **如果存在** → 执行 **代码变更检测**：
 
-   ```bash
-   # 读取上次记录的 commit hash（存储在 PROGRESS.md frontmatter 中）
-   git rev-parse HEAD   # 获取当前 HEAD
-   ```
-
-   比较当前 HEAD 与 `PROGRESS.md` 中的 `analyzed_at_commit` 字段：
-
-   **情况 A：hash 相同（代码未变）** → 直接恢复，展示恢复提示（见下方）
-
-   **情况 B：hash 不同（代码有更新）** → 执行变更影响分析：
+   首先判断被分析项目是否为 git 仓库：
 
    ```bash
-   git diff --stat {stored_commit}..HEAD
-   # 获取：哪些文件变了、变了多少行
+   git rev-parse HEAD 2>/dev/null
    ```
 
-   交叉比对变更文件列表 vs `KNOWLEDGE.md` 中已探索的文件，得出三类结果：
+   根据结果走不同分支：
 
-   | 类别 | 含义 | 处理方式 |
-   |------|------|---------|
-   | **已探索 & 已变更** | 你理解过的文件被改了 | 标记为 ⚠️ STALE，下次访问时重新读取 |
-   | **未探索 & 已变更** | 你没看过的文件被改了 | 记录变更，不影响现有理解 |
-   | **配置文件变更** | `package.json`/`go.mod` 等变了 | 触发对应维度的局部重分析 |
+   **分支 A：是 git 仓库** → 比较 commit hash：
 
-   然后向用户展示变更摘要：
+   - hash 与 `PROGRESS.md` 中 `analyzed_at_commit` 相同 → 直接恢复
+   - hash 不同 → 执行 diff 分析：
+     ```bash
+     git diff --stat {stored_commit}..HEAD
+     ```
+     交叉比对变更文件 vs `KNOWLEDGE.md` 已探索文件：
+
+     | 类别 | 处理方式 |
+     |------|---------|
+     | **已探索 & 已变更** | 标记为 ⚠️ STALE，下次访问时重读 diff |
+     | **未探索 & 已变更** | 仅记录，不影响现有理解 |
+     | **配置文件变更** | 触发对应 Agent 局部重分析 |
+
+   **分支 B：非 git 仓库**（zip 解压、无版本控制）→ 用时间戳判断：
+
+   - 比较 `PROGRESS.md` 中的 `analyzed_at` 时间戳 vs 项目文件的最新修改时间：
+     ```bash
+     find . -newer .repo-context/PROGRESS.md -type f \
+       ! -path './.repo-context/*' ! -path './node_modules/*' \
+       ! -path './.git/*' | head -20
+     ```
+   - 如有文件比上次分析时间更新 → 提示用户："检测到文件有变动（非 git 项目，无法精确 diff）"
+   - 提供两个选项：`[R] 直接恢复` 或 `[S] 全量重新分析`
+   - 注意：非 git 项目**不提供** `[U] 局部更新`选项（没有 diff 信息）
+
+   **变更摘要展示（git 仓库）：**
 
    ```
    📂 发现上次的学习记录 + 检测到代码更新
@@ -168,7 +183,13 @@ origin: learn-from-github
 ⚠️ **只用 Glob 获取文件树（路径列表），不读取源码文件内容。README 最多读前 150 行。**
 
 步骤：
-1. 用 `Glob "**/*" depth=3` 获取完整目录结构（**只拿路径，不读内容**）
+1. 用 Glob 获取完整目录结构（**只拿路径，不读内容**）：
+   ```
+   Glob pattern="*"           # 顶层目录
+   Glob pattern="*/*"         # 第二层
+   Glob pattern="*/*/*"       # 第三层（通常足够推断架构）
+   ```
+   不要使用 `**/*`（会返回所有文件，过于庞大）
 2. 识别架构模式：
    - **MVC**: `models/` + `views/` + `controllers/`
    - **Clean Architecture**: `domain/` + `application/` + `infrastructure/` + `interfaces/`
@@ -176,8 +197,19 @@ origin: learn-from-github
    - **Monorepo**: `packages/` 或 `apps/` 下有多个子项目
    - **Layered**: `api/` + `service/` + `repository/` + `model/`
    - **Microservices**: 多个独立服务目录
-3. 阅读 README.md（如存在）提取架构描述
-4. 检查 `docs/` 或 `documentation/` 目录
+3. **Monorepo 检测**：如果顶层目录中存在 `packages/`、`apps/`、`services/` 且各自包含多个子目录，判断为 monorepo。
+   此时**暂停分析**，向用户询问：
+   ```
+   ⚠️  检测到这是一个 Monorepo，包含以下子包：
+   - packages/ui
+   - packages/core
+   - apps/web
+   - apps/api
+   你想重点分析哪个？（输入路径，或输入 all 分析整体架构）
+   ```
+   根据用户选择，将后续所有 Agent 的分析范围限定在该子目录。
+4. 阅读 README.md（如存在）提取架构描述，最多读前 150 行
+5. 检查 `docs/` 或 `documentation/` 目录
 
 **输出格式**：
 ```
@@ -484,7 +516,9 @@ qa_count: 0
 
 #### 3.1 提供学习路径菜单
 
-基于 Phase 1 的分析结果，生成 3-5 条**具体的学习路径**（不是泛泛的建议，而是有序的文件阅读计划）：
+基于 Phase 1 的分析结果，生成 3-5 条**具体的学习路径**（不是泛泛的建议，而是有序的文件阅读计划）。
+
+> **注意**：以下是示例输出（基于 Node.js/Express 项目）。实际路径和文件名由 Phase 1 分析结果动态生成，Go/Python/Java 等项目的路径会完全不同。
 
 ```
 ✅ 分析完成！UNDERSTANDING.md 已生成。
