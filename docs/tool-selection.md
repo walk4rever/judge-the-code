@@ -7,13 +7,26 @@
 
 ## 工具选型
 
-### 核心三件套
+### 核心三件套（全部 Go 单二进制，零环境依赖）
 
-| 工具 | 类别 | 检测范围 | 付费情况 | 市场地位 |
+| 工具 | 类别 | 检测范围 | 付费情况 | 选择理由 |
 |------|------|---------|---------|---------|
-| **semgrep** | SAST | 代码安全漏洞（注入/XSS/越权/硬编码密钥）| CLI 完全免费；Pro $25/user/mo（托管规则+dashboard，我们不需要）| 开发者 SAST 首选；Dropbox/Snowflake/Trail of Bits 在用 |
+| **bearer** | SAST | 代码安全漏洞（注入/XSS/越权）+ PII 泄漏检测，**数据流分析** | 完全免费开源 | 单 Go 二进制；数据流分析比 semgrep 更深；覆盖 JS/TS/Python/Go/Java/Ruby/PHP |
 | **trivy** | SCA + Secrets + IaC | 依赖 CVE（npm/pip/cargo/go/maven...）+ 硬编码密钥（当前文件）+ 容器/IaC 配置错误 | 完全免费，Aqua Security 出品 | SCA 领域覆盖最全的免费工具 |
 | **gitleaks** | Secrets | Git history 中的密钥泄漏（trivy 不扫历史）| 完全免费 | 600+ 检测规则，git history 扫描最佳 |
+
+### 为什么用 Bearer 而不是 semgrep
+
+| 维度 | semgrep | bearer |
+|------|---------|--------|
+| 技术深度 | 规则匹配（Pattern matching）| **数据流分析（Taint analysis）** |
+| 跨函数漏洞 | ❌ 无法追踪 | ✅ 追踪污点传播路径 |
+| 分发方式 | pip only，**无独立二进制** | **单 Go 二进制** |
+| 环境依赖 | 需要 Python 3.9+ | 零依赖 |
+| 免费程度 | CLI 免费，Pro 付费 | 完全免费开源 |
+| 成熟度 | 14k stars，5年+ | 2.6k stars，2021年起 |
+
+**结论**：semgrep 的最大痛点（无独立二进制 → 环境多样性问题）和技术局限（无数据流分析）促使我们选择 Bearer。三件套全部是 Go 单二进制，从根本上解决了环境多样性问题。
 
 ### 未来可加（增强覆盖，暂不实现）
 
@@ -53,22 +66,15 @@ demon-hunter 需要在以下所有环境下可用：
 | **网络** | 直连 · 企业代理 · 离线/受限 |
 | **权限** | 完整权限 · 无 sudo（企业机器常见）|
 
-**核心矛盾**：
+**三件套全部是 Go 单二进制**，覆盖所有主流环境：
 
-- `trivy` / `gitleaks` 是 **Go 单二进制**，覆盖所有 OS+arch，直接下载，问题最小
-- `semgrep` **无独立二进制**（仅 pip 分发），是最大的环境多样性风险
+| 工具 | macOS x86 | macOS arm64 | Linux x86 | Linux arm64 | WSL2 | 无网络 |
+|------|:---------:|:-----------:|:---------:|:-----------:|:----:|:------:|
+| bearer | ✅ | ✅ | ✅ | ✅ | ✅ | 需预下载 |
+| trivy | ✅ | ✅ | ✅ | ✅ | ✅ | 需预下载 |
+| gitleaks | ✅ | ✅ | ✅ | ✅ | ✅ | 需预下载 |
 
-**semgrep 在各环境的可用性**：
-
-| 安装方式 | macOS | Linux | WSL2 | 无 Python | 无网络 |
-|---------|:-----:|:-----:|:----:|:---------:|:------:|
-| `uvx semgrep` | ✅ 若有 uv | ✅ 若有 uv | ✅ 若有 uv | ✅ uv 自带 Python | ❌ |
-| `pip install` | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `brew install` | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `docker run` | ✅ 若有 Docker | ✅ | ✅ | ✅ | ❌ |
-| **skill 内置 venv** | ✅ 需 Python | ✅ 需 Python | ✅ 需 Python | ❌ | ❌ |
-
-**结论**：没有任何一种方式能覆盖所有环境。必须使用**有序 fallback 链**。
+**结论**：环境多样性问题通过"全部选 Go 单二进制"从根本上解决。
 
 ---
 
@@ -95,12 +101,17 @@ demon-hunter 需要在以下所有环境下可用：
 
 ### 各工具的隔离方式
 
-**trivy 和 gitleaks**（Go 单二进制）：
-- 直接从 GitHub Releases 下载到 `SKILL_DIR/bin/`
-- 无任何依赖，无系统污染
-- 按需下载，首次运行时触发
+三件套全部是 **Go 单二进制**，安装方式完全一致：
+
+- 下载到 `SKILL_DIR/bin/`，不写入系统 PATH
+- 无任何运行时依赖
+- 首次运行时由 `setup` 脚本自动下载，后续直接使用
 
 ```bash
+# bearer
+curl -sSfL "https://github.com/Bearer/bearer/releases/download/v${VER}/bearer_${VER}_${os}_${arch}.tar.gz" \
+  | tar -xz -C "$SKILL_DIR/bin" bearer
+
 # trivy
 curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${VER}/trivy_${VER}_${OS}_${ARCH}.tar.gz" \
   | tar -xz -C "$SKILL_DIR/bin" trivy
@@ -108,24 +119,6 @@ curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${VER}/triv
 # gitleaks
 curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_${os}_${arch}.tar.gz" \
   | tar -xz -C "$SKILL_DIR/bin" gitleaks
-```
-
-**semgrep**（Python 工具，无独立二进制分发）：
-
-优先级检测，按顺序尝试：
-
-```
-优先级 1：uvx semgrep        — 若 uv 已安装，最优选择
-                               uv 自动创建隔离临时环境，无系统污染
-                               运行后环境自动清理
-                               uv 是现代 Python 工具链标准，越来越普及
-
-优先级 2：SKILL_DIR/.venv    — skill 内置 venv（uv venv 创建）
-          uv venv $SKILL_DIR/.venv && uv pip install semgrep
-          完全隔离，不影响系统 Python 和其他项目
-
-优先级 3：提示安装            — 以上都不可用时，给出安装建议
-          "需要安装 uv（推荐）或 semgrep：brew install uv"
 ```
 
 ### trivy / gitleaks 的二进制下载策略
@@ -181,31 +174,23 @@ ARCH=$(uname -m)  # x86_64 | arm64 | aarch64
 
 ### 整体执行入口（find-tools 脚本）
 
+三件套统一逻辑：优先用 `SKILL_DIR/bin/`，其次用系统 PATH，缺失则标记 MISSING。
+
 ```bash
 #!/usr/bin/env bash
 # SKILL_DIR/bin/find-tools
-# 输出各工具的可执行路径，供 SKILL.md 引用
-
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$SKILL_DIR/bin"
 
-# trivy
-if [ -x "$BIN/trivy" ]; then echo "TRIVY=$BIN/trivy"
-elif command -v trivy &>/dev/null; then echo "TRIVY=$(command -v trivy)"
-else echo "TRIVY=MISSING"; fi
-
-# gitleaks
-if [ -x "$BIN/gitleaks" ]; then echo "GITLEAKS=$BIN/gitleaks"
-elif command -v gitleaks &>/dev/null; then echo "GITLEAKS=$(command -v gitleaks)"
-else echo "GITLEAKS=MISSING"; fi
-
-# semgrep（有序 fallback）
-if [ -x "$SKILL_DIR/.venv/bin/semgrep" ]; then echo "SEMGREP=$SKILL_DIR/.venv/bin/semgrep"
-elif command -v uvx &>/dev/null; then echo "SEMGREP=uvx semgrep"
-elif command -v pipx &>/dev/null; then echo "SEMGREP=pipx run semgrep"
-elif command -v docker &>/dev/null; then echo "SEMGREP=docker run --rm -v \$(pwd):/src semgrep/semgrep"
-elif command -v semgrep &>/dev/null; then echo "SEMGREP=$(command -v semgrep)"
-else echo "SEMGREP=MISSING"; fi
+for tool in bearer trivy gitleaks; do
+  if [ -x "$BIN/$tool" ]; then
+    echo "${tool^^}=$BIN/$tool"
+  elif command -v "$tool" &>/dev/null; then
+    echo "${tool^^}=$(command -v $tool)"
+  else
+    echo "${tool^^}=MISSING"
+  fi
+done
 ```
 
 ### 缺失工具的处理原则
@@ -213,16 +198,16 @@ else echo "SEMGREP=MISSING"; fi
 **不因某个工具缺失而整体失败**，而是：
 
 1. 输出哪些维度被跳过及原因
-2. 给出针对当前环境的安装建议
+2. 给出安装建议（setup 脚本路径）
 3. 已可用的工具继续扫描，输出部分结果
 
 ```
 🔍 demon-hunter 扫描报告
 
+✅ 代码漏洞扫描 (bearer)      — 完成，发现 2 个高危漏洞
 ✅ 依赖 CVE 扫描 (trivy)      — 完成，发现 3 个高危漏洞
-✅ Git 密钥扫描 (gitleaks)    — 完成，未发现泄漏
-⚠️ 代码漏洞扫描 (semgrep)    — 已跳过（未安装）
-   → 安装建议：uv tool install semgrep
+⚠️ Git 密钥扫描 (gitleaks)   — 已跳过（未安装）
+   → 运行 setup 脚本安装：{SKILL_DIR}/setup
 ✅ 设计陷阱分析 (Claude)      — 完成，发现 2 个隐患
 ```
 
