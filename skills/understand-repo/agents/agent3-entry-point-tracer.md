@@ -11,7 +11,11 @@
 ## 按语言寻找入口文件
 
 - **Node.js**: `index.js/ts`, `server.js/ts`, `app.js/ts`, `main.js/ts`, `package.json` 的 `main`/`bin` 字段
-- **Next.js/React**: `app/page.tsx`, `pages/index.tsx`, `src/App.tsx`
+- **Next.js App Router**: `app/layout.tsx`（根布局，相当于应用入口）、`app/page.tsx`（首页）、`middleware.ts`（请求拦截层）
+  - ⚠️ Next.js 无传统 `server.ts:listen()` 启动入口，框架自动处理
+  - 入口路径是 `app/` 目录结构，API 路由在 `app/api/` 下
+  - 请求流程：`middleware.ts` → `app/layout.tsx` → `app/[route]/page.tsx` → `app/api/[handler]/route.ts`
+- **Next.js Pages Router**: `pages/_app.tsx`, `pages/index.tsx`
 - **Go**: `main.go`, `cmd/*/main.go`
 - **Python**: `main.py`, `app.py`, `manage.py` (Django), `run.py`, `__main__.py`
 - **Java**: 包含 `public static void main` 的文件，`Application.java` (Spring Boot)

@@ -101,12 +101,15 @@ understand-repo  →  philosophy-extractor  →  demon-hunter
 ## 安装
 
 ```bash
-# 安装单个 skill
+# 安装单个 skill（含 agents/ 子目录）
 cp -r skills/understand-repo ~/.claude/skills/
+cp -r skills/philosophy-extractor ~/.claude/skills/
 
 # 安装全部
 cp -r skills/* ~/.claude/skills/
 ```
+
+> ⚠️ **升级提示**：每次更新 judge-the-code 后需重新执行 cp，否则 `~/.claude/skills/` 中的版本不会更新。
 
 ---
 

@@ -12,6 +12,7 @@
 
 - `README.md` — 前 **150 行**，用 Grep 搜索 `"install\|setup\|getting started\|run\|start\|require\|gpu\|cuda\|hardware"` 定位相关章节
 - `.env.example` / `.env.sample` — 前 **50 行**，只提取变量名和注释
+- `scripts/validate-env.*` / `src/config/env.*` / `config/env.*` — 前 **60 行**，作为 `.env.example` 的替代；自定义校验脚本通常包含完整的必填变量清单和说明
 - `package.json` scripts 字段 — 用 Grep 搜索 `"scripts"` 附近 **30 行**
 - `Makefile` — 前 **40 行**（通常 target 都在前面）
 - `docker-compose.yml` — 前 **60 行**
