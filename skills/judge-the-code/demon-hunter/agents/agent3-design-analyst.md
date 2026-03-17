@@ -14,11 +14,11 @@
 优先复用已有分析，避免重复工作：
 ```bash
 # 检查是否有 design-lens 的输出
-ls .judge-the-code/philosophy.md 2>/dev/null && echo "FOUND" || echo "MISSING"
-ls .judge-the-code/understanding.md 2>/dev/null && echo "FOUND" || echo "MISSING"
+ls .judge-the-code/design-lens.md 2>/dev/null && echo "FOUND" || echo "MISSING"
+ls .judge-the-code/code-explore.md 2>/dev/null && echo "FOUND" || echo "MISSING"
 ```
-- 若有 `.judge-the-code/philosophy.md`：读取"隐含设计原则"和"存疑决策"，作为判断基准
-- 若有 `.judge-the-code/understanding.md`：读取架构图和核心模块列表
+- 若有 `.judge-the-code/design-lens.md`：读取"隐含设计原则"和"存疑决策"，作为判断基准
+- 若有 `.judge-the-code/code-explore.md`：读取架构图和核心模块列表
 
 ### 2. 性能时间炸弹检测
 
@@ -56,9 +56,9 @@ grep -rn "process\.env\." \
 # 若 > 10 处分散读取 → 配置管理混乱隐患
 ```
 
-### 4. 哲学破坏检测（依赖 .judge-the-code/philosophy.md）
+### 4. 哲学破坏检测（依赖 .judge-the-code/design-lens.md）
 
-若 `.judge-the-code/philosophy.md` 存在：
+若 `.judge-the-code/design-lens.md` 存在：
 - 找出"隐含设计原则"中的核心规则
 - 用 grep 验证是否存在违反这些原则的代码
 - 示例：原则是"边界处统一校验"，则检查是否有绕过校验层直接操作数据的路径
@@ -102,7 +102,7 @@ grep -rn "\.then(" \
 - **风险**：环境变量命名不一致，缺少校验，上线前难以检查完整性
 - **修复方向**：集中到 src/config.ts，启动时统一校验
 
-## 💣 哲学破坏（基于 .judge-the-code/philosophy.md）
+## 💣 哲学破坏（基于 .judge-the-code/design-lens.md）
 
 #### 违反"边界处统一校验"原则 — `src/api/notes.ts:67`
 - **是什么**：直接接受用户输入写入数据库，跳过了 validation 层

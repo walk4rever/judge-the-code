@@ -39,7 +39,7 @@ version: 1.1.0
 
 > **核心策略：有目的地采样源码，找模式而非读实现。**
 
-1. **优先复用** `.judge-the-code/understanding.md`：如果 code-explore 已运行过，直接读取，跳过重复分析
+1. **优先复用** `.judge-the-code/code-explore.md`：如果 code-explore 已运行过，直接读取，跳过重复分析
 2. **Grep 先于 Read**：用关键词定位典型代码片段，不要盲目读整个文件
 3. **采样而非全读**：每个维度只读 3-5 个代表性文件，每文件最多 80 行
 4. **测试文件是宝藏**：这里 **允许** 读测试文件（code-explore 明确禁止），测试命名和结构最能透露设计取向
@@ -74,7 +74,7 @@ version: 1.1.0
    - **`IS_FILE`** → 输出后停止：`❌ {path} 是一个文件，请提供项目根目录路径。`
    - **`OK`** → 继续执行步骤 2
 
-2. **检查是否有 `.judge-the-code/understanding.md`**（code-explore 的输出）：
+2. **检查是否有 `.judge-the-code/code-explore.md`**（code-explore 的输出）：
    - **存在** → 读取全文作为背景上下文，**直接跳到 Phase 1**
    - **不存在** → 快速读取 `package.json` / `go.mod` / `pyproject.toml` 等识别语言和框架（最多读 2 个文件，各 50 行），然后进入 Phase 1
 
@@ -137,7 +137,7 @@ version: 1.1.0
 - 不确定时用 ✅，宁可保守也不随意打 ❌
 - 每条必须有**具体证据**（文件路径 + 代码片段），不能只有结论
 
-#### Step 2：生成 .judge-the-code/philosophy.md
+#### Step 2：生成 .judge-the-code/design-lens.md
 
 ```markdown
 # [项目名] — 设计哲学报告
@@ -226,11 +226,11 @@ version: 1.1.0
 | **整体设计品味** | **⭐⭐⭐⭐☆** | **务实、克制、有意识的简洁** |
 ```
 
-保存到`.judge-the-code/philosophy.md`。
+保存到`.judge-the-code/design-lens.md`。
 
 **保存完成后，输出：**
 ```
-📄 .judge-the-code/philosophy.md 已生成
+📄 .judge-the-code/design-lens.md 已生成
 
 进入互动模式，你可以继续问：
 - "为什么 [某个决策] 被标记为存疑？"
@@ -242,7 +242,7 @@ version: 1.1.0
 
 ### Phase 3：深度问答模式
 
-生成完 `.judge-the-code/philosophy.md` 后，进入**设计讨论模式**。
+生成完 `.judge-the-code/design-lens.md` 后，进入**设计讨论模式**。
 
 **处理用户追问时的原则：**
 

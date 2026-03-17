@@ -3,7 +3,7 @@ name: demon-hunter
 description: >-
   发现代码库中的安全漏洞、依赖 CVE、密钥泄漏和设计层隐患。
   混合架构：bearer（SAST 数据流分析）+ trivy（依赖漏洞）+ gitleaks（密钥泄漏）
-  三件套工具扫描，加 Claude 语义分析，输出 .judge-the-code/demons.md 报告。
+  三件套工具扫描，加 Claude 语义分析，输出 .judge-the-code/demon-hunter.md 报告。
   TRIGGER when: 用户想找安全漏洞、检查依赖风险、审查 AI 生成的代码、
   或说了"帮我找漏洞"、"有没有安全问题"、"这个项目有什么隐患"。
   DO NOT TRIGGER when: 用户只想理解项目结构（用 code-explore）
@@ -185,7 +185,7 @@ $GITLEAKS detect \
 
 ---
 
-### Phase 4：综合输出 .judge-the-code/demons.md
+### Phase 4：综合输出 .judge-the-code/demon-hunter.md
 
 收集 3 个 Agent 的结果，生成完整报告：
 
@@ -223,7 +223,7 @@ $GITLEAKS detect \
 [来自 Agent 3]
 
 ## 💣 哲学破坏
-[来自 Agent 3，若有 .judge-the-code/philosophy.md]
+[来自 Agent 3，若有 .judge-the-code/design-lens.md]
 
 ## 🪤 陷阱 API
 [来自 Agent 3]
@@ -248,11 +248,11 @@ $GITLEAKS detect \
 [若有工具未安装，说明缺失了什么覆盖，及安装方式]
 ```
 
-保存到`.judge-the-code/demons.md`。
+保存到`.judge-the-code/demon-hunter.md`。
 
 **保存完成后，输出：**
 ```
-📄 .judge-the-code/demons.md 已生成
+📄 .judge-the-code/demon-hunter.md 已生成
 
 进入互动模式，你可以继续问：
 - "帮我展开说说 [某个漏洞]"

@@ -15,7 +15,7 @@
    ```
    从提交信息中推断：重大重构、技术选型变化、设计理念演进
 
-2. **分析依赖选择的"为什么"**（读 `.judge-the-code/understanding.md` 中依赖部分，或重新读 `package.json`）：
+2. **分析依赖选择的"为什么"**（读 `.judge-the-code/code-explore.md` 中依赖部分，或重新读 `package.json`）：
 
    重点关注**非显然的选择**：
    - 同类库中选了哪个？（用了 `drizzle` 而非 `prisma`？用了 `zod` 而非 `joi`？）

@@ -3,7 +3,7 @@ name: code-explore
 description: >-
   帮助普通技术人快速理解一个陌生的 GitHub 项目。通过 5 个并行分析 Agent，从技术栈、
   架构设计、入口流程、依赖意图、开发环境五个维度深度分析代码库，
-  最终生成结构化的《项目理解指南》(.judge-the-code/understanding.md)，并进入交互式答疑模式。
+  最终生成结构化的《项目理解指南》(.judge-the-code/code-explore.md)，并进入交互式答疑模式。
   TRIGGER when: 用户想理解、学习、研究一个 clone 下来的 GitHub 项目，
   或说了"帮我看看这个项目"、"分析这个仓库"、"这个项目怎么工作的"。
   DO NOT TRIGGER when: 用户只想修改或调试某个具体文件。
@@ -210,7 +210,7 @@ find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/code-explore/*"
 
 ### Phase 2：综合输出
 
-收集所有 5 个 Agent 的结果后，生成完整的 `.judge-the-code/understanding.md`：
+收集所有 5 个 Agent 的结果后，生成完整的 `.judge-the-code/code-explore.md`：
 
 ```markdown
 # [项目名] — 项目理解指南
@@ -270,11 +270,11 @@ A: [如果项目有认证的话]
 A: [基于架构给出步骤]
 ```
 
-保存文件到`.judge-the-code/understanding.md`。
+保存文件到`.judge-the-code/code-explore.md`。
 
 **保存完成后，输出：**
 ```
-📄 .judge-the-code/understanding.md 已生成
+📄 .judge-the-code/code-explore.md 已生成
 ```
 
 同时初始化状态目录（如不存在则创建）：
@@ -349,7 +349,7 @@ qa_count: 0
 
 ### Phase 3：渐进式深度学习模式
 
-生成完 `.judge-the-code/understanding.md` 后，进入**渐进式学习模式**。
+生成完 `.judge-the-code/code-explore.md` 后，进入**渐进式学习模式**。
 
 #### 3.1 提供学习路径菜单
 
@@ -358,7 +358,7 @@ qa_count: 0
 > **注意**：以下是示例输出（基于 Node.js/Express 项目）。实际路径和文件名由 Phase 1 分析结果动态生成，Go/Python/Java 等项目的路径会完全不同。
 
 ```
-✅ 分析完成！.judge-the-code/understanding.md 已生成。
+✅ 分析完成！.judge-the-code/code-explore.md 已生成。
 
 根据这个项目的结构，我为你准备了几条学习路径，选一条开始？
 
@@ -527,7 +527,7 @@ qa_count: 0
 | `state/progress.md` | 当前路径、步骤、已探索文件列表 | 每次读取新文件后 |
 | `state/knowledge.md` | 每个已读文件的理解摘要 | 每次读取新文件后 |
 | `state/notes.md` | Q&A 洞察、关键结论 | 每次问答产生重要发现后 |
-| `.judge-the-code/understanding.md` | Phase 2 生成的全局概览 | Phase 2 完成时一次性写入 |
+| `.judge-the-code/code-explore.md` | Phase 2 生成的全局概览 | Phase 2 完成时一次性写入 |
 
 **关于版本控制**：在分析开始时，如果项目有 `.gitignore`，建议（但不强制）追加：
 ```

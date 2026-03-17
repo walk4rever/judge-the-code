@@ -31,7 +31,7 @@ code-explore  →  design-lens  →  demon-hunter
 ```
 
 5 个并行 Agent 分析技术栈、架构、入口、依赖、开发环境。
-输出 `.judge-the-code/understanding.md` + 渐进式导览模式。
+输出 `.judge-the-code/code-explore.md` + 渐进式导览模式。
 
 ### 第二步：提炼设计哲学
 
@@ -40,7 +40,7 @@ code-explore  →  design-lens  →  demon-hunter
 ```
 
 4 个并行 Agent 分析命名风格、错误处理、测试取向、架构决策。
-输出 `.judge-the-code/philosophy.md`，每条决策打标签：🔮 精妙 / ✅ 合理 / ⚠️ 存疑 / ❌ 反模式。
+输出 `.judge-the-code/design-lens.md`，每条决策打标签：🔮 精妙 / ✅ 合理 / ⚠️ 存疑 / ❌ 反模式。
 
 ### 第三步：猎杀恶魔
 
