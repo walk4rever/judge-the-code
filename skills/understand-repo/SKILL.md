@@ -151,6 +151,20 @@ version: 1.2.0
 
 ### Phase 1：并行 5 Agent 分析
 
+**启动前，输出以下进度公告：**
+
+```
+🚀 开始分析，同时启动 5 个 Agent...
+
+  Agent 1 — 技术栈探测    ⏳ 分析中
+  Agent 2 — 架构分析      ⏳ 分析中
+  Agent 3 — 入口追踪      ⏳ 分析中
+  Agent 4 — 依赖解析      ⏳ 分析中
+  Agent 5 — 开发环境      ⏳ 分析中
+
+预计完成时间：2-4 分钟
+```
+
 **同时启动以下 5 个 Explore 子 Agent，全部并行执行：**
 
 ---
@@ -187,6 +201,11 @@ version: 1.2.0
 - 构建工具: [webpack/vite/esbuild/make 等]
 - 测试框架: [jest/pytest/go test 等]
 - 类型系统: [TypeScript/mypy/强类型/动态类型]
+```
+
+**Agent 1 完成后，输出：**
+```
+✅ Agent 1/5 完成 — 技术栈已识别
 ```
 
 ---
@@ -284,6 +303,11 @@ graph TD
 | ... | ... | ... |
 ```
 
+**Agent 2 完成后，输出：**
+```
+✅ Agent 2/5 完成 — 架构图已生成
+```
+
 ---
 
 #### Agent 3 — 入口追踪者 (Entry Point Tracer)
@@ -344,6 +368,11 @@ sequenceDiagram
 3. `src/services/` — 核心业务逻辑所在
 ```
 
+**Agent 3 完成后，输出：**
+```
+✅ Agent 3/5 完成 — 入口流程已梳理
+```
+
 ---
 
 #### Agent 4 — 依赖分析师 (Dependency Analyst)
@@ -387,6 +416,11 @@ sequenceDiagram
 ### 技术选型风格
 [保守稳定 / 激进前沿 / 轻量极简 / 重型企业级]
 原因: ...
+```
+
+**Agent 4 完成后，输出：**
+```
+✅ Agent 4/5 完成 — 依赖关系已解析
 ```
 
 ---
@@ -491,6 +525,13 @@ npm run dev
 | `REDIS_URL` | ❌ | Redis 地址，默认 localhost:6379 |
 ```
 
+**Agent 5 完成后，输出：**
+```
+✅ Agent 5/5 完成 — 开发环境已整理
+
+所有 Agent 完成，正在综合输出...
+```
+
 ---
 
 ### Phase 2：综合输出
@@ -556,6 +597,11 @@ A: [基于架构给出步骤]
 ```
 
 保存文件到项目根目录的 `UNDERSTANDING.md`。
+
+**保存完成后，输出：**
+```
+📄 UNDERSTANDING.md 已生成
+```
 
 同时初始化状态目录（如不存在则创建）：
 
