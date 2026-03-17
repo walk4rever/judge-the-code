@@ -88,14 +88,14 @@ AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的
 #### 4. `philosophy-extractor` Skill 设计与实现
 - **What**: 新 skill，提取代码库的设计哲学、关键决策和值得学习的地方
 - **Why**: 这是 judge-the-code 的核心差异化——现在没有任何工具做这件事
-- **How（待设计）**:
-  - 分析命名规范、抽象层级、错误处理方式等设计选择
-  - 识别"非显而易见"的决策，解释其背后的权衡
-  - 对比业界常见做法，指出"这里选择了不一样的路，为什么"
-  - 输出：设计决策清单 + 每个决策的评价（精妙/合理/存疑）
+- **How**:
+  - 4 个并行 Agent：命名与抽象哲学 / 错误处理取向 / 测试与质量信仰 / 架构决策考古
+  - 决策评价标签：🔮 精妙 / ✅ 合理 / ⚠️ 存疑 / ❌ 反模式
+  - 输出：`PHILOSOPHY.md`（设计决策清单 + 隐含原则 + 值得偷走的模式）
+  - 复用 `UNDERSTANDING.md`（如果已运行 understand-repo）节省 token
 - **验收**: 对已知项目（如 Express、FastAPI）能输出有洞察的设计决策分析
 - **Effort**: L
-- **Depends on**: P1 完成，understand-repo 稳定后启动
+- **Status**: ✅ 完成（v0.3.0）
 
 #### 5. 拆分多文件 skill 结构
 - **What**: 将 understand-repo 的单一 800+ 行 SKILL.md 拆分为多文件
