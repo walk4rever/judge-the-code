@@ -149,14 +149,18 @@ AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的
 ```
 judge-the-code/
 ├── skills/
-│   ├── understand-repo/     # Skill，纯 markdown
-│   │   └── SKILL.md
-│   ├── philosophy-extractor/ # Skill，纯 markdown
-│   │   └── SKILL.md
-│   └── demon-hunter/        # Skill，调用 Go CLI
-│       └── SKILL.md
+│   └── judge-the-code/          # 单目录安装，cp -r 到 ~/.agents/skills/
+│       ├── SKILL.md             # 顶层索引，说明整体工作流
+│       ├── understand-repo/     # Skill，纯 markdown
+│       │   ├── SKILL.md
+│       │   └── agents/          # 各维度 Agent 规格（多文件结构）
+│       ├── philosophy-extractor/ # Skill，纯 markdown
+│       │   ├── SKILL.md
+│       │   └── agents/
+│       └── demon-hunter/        # Skill，调用 Go CLI
+│           └── SKILL.md
 ├── cmd/
-│   └── demon-hunter/        # Go CLI，调用 semgrep/trivy/audit
+│   └── demon-hunter/            # Go CLI，调用 semgrep/trivy/audit
 │       └── main.go
 ├── README.md
 └── TODO.md
