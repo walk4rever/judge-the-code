@@ -1,130 +1,131 @@
 # judge-the-code
 
-> 帮助人类在 AI 大量生成代码的时代，保持对代码的 Judgment 和 Taste。
+> Help humans maintain Judgment and Taste over code in the age of AI-generated software.
+
+English | [中文](README.zh.md)
 
 ---
 
-## 为什么需要这个工具
+## Why this exists
 
-以前，写代码和理解代码是同一个动作。你写了什么，你就理解什么。
+Before AI, writing code and understanding code were the same act. You wrote it, you understood it.
 
-现在，AI 在写代码。写和懂被解耦了。
+Now AI writes the code. Writing and understanding have decoupled.
 
-**AI 让代码能跑。但能跑不等于好。**
+**AI makes code run. But running isn't the same as good.**
 
-AI 生成的代码可能：
-- 引入你没意识到的安全漏洞
-- 破坏项目原有的设计哲学
-- 埋下在 10 万用户时才爆的性能炸弹
-- 用了"有效"的捷径，制造下一个人踩不完的坑
+AI-generated code can:
+- Introduce security vulnerabilities you never noticed
+- Break the design philosophy your project was built on
+- Plant performance time bombs that explode at 100k users
+- Take "working" shortcuts that become the next developer's nightmare
 
-发现这些，需要人真正理解代码库的 DNA——它的设计取向、历史决策、在乎什么。
+Spotting these requires truly understanding a codebase's DNA — its design intent, historical decisions, what it cares about.
 
-这个理解，不能靠 lint，不能靠测试，**只能靠人的判断力**。
+That understanding can't come from lint. It can't come from tests. **It can only come from human judgment.**
 
-`judge-the-code` 是帮你维持这个判断力的工具。
-
----
-
-## 两件事
-
-```
-Taste（欣赏力）                    Judgment（判断力）
-──────────────────────────────────────────────────────
-这里的设计很精妙，为什么？           这里有个坑，小心
-这个抽象层级恰到好处               这个模式看起来干净，但会爆
-这是一个值得学习的决策             这里有个隐性安全漏洞
-这个 API 让错误用法很难发生         这个假设在高并发下会失效
-
-让人看见代码的好                   让人看见代码的恶
-```
+`judge-the-code` is the tool that helps you keep that judgment sharp.
 
 ---
 
-## 架构
+## Two things
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    judge-the-code                           │
-├──────────────────────────┬──────────────────────────────────┤
-│    Skill 层（Claude）     │      Tool 层（Go CLI）            │
-├──────────────────────────┼──────────────────────────────────┤
-│  code-explore         │                                  │
-│  design-lens    │                                  │
-│                          │                                  │
-│  demon-hunter ←──────────┼── semgrep / npm audit / trivy   │
-│  • 解读扫描结果           │   确定性扫描，CVE 数据库支撑      │
-│  • 结合项目上下文判断     │   go install 一行装好            │
-│  • 解释为什么危险         │                                  │
-│  • 给出修复建议           │                                  │
-└──────────────────────────┴──────────────────────────────────┘
+Taste                               Judgment
+────────────────────────────────────────────────────
+This design is clever — why?        There's a trap here, watch out
+This abstraction level is just right  This pattern looks clean but will break
+This is a decision worth learning   There's a hidden security hole here
+This API makes misuse hard          This assumption fails under high concurrency
 
-工具找问题（确定性）  +  Claude 解释问题（语义性）
+Seeing what's good in code          Seeing what's dangerous in code
+```
+
+---
+
+## Architecture
+
+```
+Tools find problems (deterministic)  +  Claude explains them (semantic)
+
+Skill layer (Claude)            Tool layer (Go binaries)
+────────────────────────────────────────────────────────
+code-explore                   ← reads directory structure
+design-lens                    ← samples source files
+demon-hunter  ←─────────────── bearer / trivy / gitleaks
+• interprets scan results           deterministic scanning, CVE databases
+• judges with project context        single binaries, one-line setup
+• explains why it's dangerous
+• gives fix recommendations
 ```
 
 ## Skills
 
-| 组件 | 形态 | 作用 | 状态 |
-|------|------|------|------|
-| `code-explore` | Skill | 建立代码库全局认知（结构、技术栈、入口、依赖） | ✅ 可用 |
-| `design-lens` | Skill | 提取设计哲学与关键决策，找到值得学习和质疑的地方 | ✅ 可用 |
-| `demon-hunter` | Skill + 工具 | 发现安全漏洞、依赖 CVE、密钥泄漏、性能隐患、设计陷阱 | ✅ 可用 |
+| Component | Type | Purpose | Status |
+|-----------|------|---------|--------|
+| `code-explore` | Skill | Build global understanding of a codebase (structure, stack, entry points, dependencies) | ✅ Ready |
+| `design-lens` | Skill | Extract design philosophy and key decisions — find what's brilliant, reasonable, or questionable | ✅ Ready |
+| `demon-hunter` | Skill + Tools | Find security vulnerabilities, dependency CVEs, leaked secrets, performance traps, design hazards | ✅ Ready |
 
-三个组件组合使用，构成完整的 `judge-the-code` 工作流：
+Together they form the full `judge-the-code` workflow:
 
 ```
 code-explore  →  design-lens  →  demon-hunter
-"这个项目长什么样"    "哪里设计得好，为什么"      "哪里有恶魔"
-     结构层                 欣赏层                  判断层
+"What does this   "What's good or     "Where are
+ project look like?" bad about the design?" the demons?"
+  Structure layer    Taste layer         Judgment layer
 ```
 
 ---
 
-## 使用方式
+## Usage
 
 ```bash
-# 第一步：理解项目结构
-/code-explore .
+/code-explore .       # Step 1: understand the codebase structure
+/design-lens .        # Step 2: extract design philosophy
+/demon-hunter .       # Step 3: hunt for demons
 
-# 第二步：提取设计哲学（规划中）
-/design-lens .
-
-# 第二步：提炼设计哲学
-/design-lens .
-
-# 第三步：猎杀恶魔
-/demon-hunter .
+view .                # Open dashboard in browser
 ```
 
 ---
 
-## 安装
+## Installation
 
 ```bash
-# 1. 复制 skill
+# 1. Copy the skill
 cp -r skills/judge-the-code ~/.agents/skills/
 
-# 2. 一次性 setup（构建 dashboard + 下载扫描工具）
+# 2. One-time setup (builds dashboard binary + downloads scan tools)
 ~/.agents/skills/judge-the-code/setup
 ```
 
-> ⚠️ **升级提示**：每次更新后重新执行 cp 即可覆盖旧版本。
+> ⚠️ **Upgrading**: re-run `cp` after each update to overwrite the installed version.
 
 ## Dashboard
-
-分析完毕后，在项目目录运行：
 
 ```bash
 ~/.agents/skills/judge-the-code/bin/view .
 ```
 
-自动生成 `.judge-the-code/dashboard.html` 并在浏览器打开，渲染 Mermaid 架构图、设计决策评级、安全漏洞报告。
+Generates `.judge-the-code/dashboard.html` and opens it in your browser. Renders Mermaid architecture diagrams, color-coded design decisions, and severity-graded security findings.
+
+### Output files
+
+```
+.judge-the-code/
+├── code-explore.md     ← code-explore report
+├── design-lens.md      ← design-lens report
+├── demon-hunter.md     ← demon-hunter report
+├── dashboard.html      ← visual dashboard
+└── state/              ← internal skill state (ignore this)
+```
 
 ---
 
-## 适用场景
+## Use cases
 
-- **评估一个库要不要引入** — 不只看它能干什么，还看它有什么坑
-- **学习优秀项目的设计** — 带着批判性眼光，找到真正值得偷的东西
-- **Review AI 生成的代码** — 验证 AI 没有破坏项目的设计哲学，没有埋雷
-- **接手陌生代码库** — 快速建立判断力，而不只是走马观花
+- **Evaluating whether to adopt a library** — not just what it does, but what traps it hides
+- **Learning from well-designed projects** — with a critical eye, finding what's genuinely worth stealing
+- **Reviewing AI-generated code** — verifying it didn't break the design philosophy or bury a mine
+- **Onboarding to an unfamiliar codebase** — building real judgment, not just a surface tour
