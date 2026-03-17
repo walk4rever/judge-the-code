@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# demon-hunter setup — download bearer, trivy, gitleaks to SKILL_DIR/bin/
+# No system-level installation. All binaries stay inside the skill directory.
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN_DIR="$SKILL_DIR/bin"
+mkdir -p "$BIN_DIR"
+
+# ── OS / arch detection ───────────────────────────────────────────────────────
+OS=$(uname -s)    # Darwin | Linux
+ARCH=$(uname -m)  # x86_64 | arm64 | aarch64
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
+
+case "$OS" in
+  Darwin|Linux) ;;
+  *) echo "❌ Unsupported OS: $OS (supported: macOS, Linux)"; exit 1 ;;
+esac
+case "$ARCH" in
+  x86_64|arm64) ;;
+  *) echo "❌ Unsupported arch: $ARCH (supported: x86_64, arm64)"; exit 1 ;;
+esac
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+latest_version() {
+  # $1 = owner/repo
+  curl -sf "https://api.github.com/repos/$1/releases/latest" \
+    | grep '"tag_name"' | head -1 \
+    | sed 's/.*"v\?\([^"]*\)".*/\1/'
+}
+
+download_tar() {
+  # $1=display_name $2=url $3=binary_name_in_archive
+  local name="$1" url="$2" bin="$3"
+  echo "  Downloading $name..."
+  local tmp
+  tmp=$(mktemp -d)
+  curl -sSfL --retry 3 "$url" | tar -xz -C "$tmp"
+  local found
+  found=$(find "$tmp" -type f -name "$bin" | head -1)
+  if [ -z "$found" ]; then
+    echo "  ❌ $bin not found in archive. Contents:"; ls "$tmp"; rm -rf "$tmp"; return 1
+  fi
+  mv "$found" "$BIN_DIR/$bin"
+  chmod +x "$BIN_DIR/$bin"
+  rm -rf "$tmp"
+  echo "  ✅ $name → $BIN_DIR/$bin"
+}
+
+# ── bearer ────────────────────────────────────────────────────────────────────
+# naming: bearer_VERSION_darwin_amd64.tar.gz | bearer_VERSION_linux_arm64.tar.gz
+install_bearer() {
+  if [ -x "$BIN_DIR/bearer" ]; then echo "  ✅ bearer already installed"; return; fi
+  local ver; ver=$(latest_version "Bearer/bearer")
+  local os arch
+  [ "$OS" = "Darwin" ] && os="darwin" || os="linux"
+  [ "$ARCH" = "x86_64" ] && arch="amd64" || arch="arm64"
+  download_tar "bearer v${ver}" \
+    "https://github.com/Bearer/bearer/releases/download/v${ver}/bearer_${ver}_${os}_${arch}.tar.gz" \
+    "bearer"
+}
+
+# ── trivy ─────────────────────────────────────────────────────────────────────
+# naming: trivy_VERSION_macOS-64bit.tar.gz | trivy_VERSION_Linux-ARM64.tar.gz
+install_trivy() {
+  if [ -x "$BIN_DIR/trivy" ]; then echo "  ✅ trivy already installed"; return; fi
+  local ver; ver=$(latest_version "aquasecurity/trivy")
+  local os arch
+  if [ "$OS" = "Darwin" ]; then
+    os="macOS"; [ "$ARCH" = "x86_64" ] && arch="64bit" || arch="ARM64"
+  else
+    os="Linux"; [ "$ARCH" = "x86_64" ] && arch="64bit" || arch="ARM64"
+  fi
+  download_tar "trivy v${ver}" \
+    "https://github.com/aquasecurity/trivy/releases/download/v${ver}/trivy_${ver}_${os}-${arch}.tar.gz" \
+    "trivy"
+}
+
+# ── gitleaks ──────────────────────────────────────────────────────────────────
+# naming: gitleaks_VERSION_darwin_arm64.tar.gz | gitleaks_VERSION_linux_x64.tar.gz
+install_gitleaks() {
+  if [ -x "$BIN_DIR/gitleaks" ]; then echo "  ✅ gitleaks already installed"; return; fi
+  local ver; ver=$(latest_version "gitleaks/gitleaks")
+  local os arch
+  [ "$OS" = "Darwin" ] && os="darwin" || os="linux"
+  [ "$ARCH" = "x86_64" ] && arch="x64" || arch="arm64"
+  download_tar "gitleaks v${ver}" \
+    "https://github.com/gitleaks/gitleaks/releases/download/v${ver}/gitleaks_${ver}_${os}_${arch}.tar.gz" \
+    "gitleaks"
+}
+
+# ── main ──────────────────────────────────────────────────────────────────────
+echo "🔧 demon-hunter setup"
+echo "   Platform: $OS/$ARCH"
+echo "   Install dir: $BIN_DIR"
+echo ""
+
+install_bearer
+install_trivy
+install_gitleaks
+
+echo ""
+echo "✅ All tools ready."
+echo "   Run: /demon-hunter <path>"

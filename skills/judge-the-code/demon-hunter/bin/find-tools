@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Locate bearer / trivy / gitleaks.
+# Outputs: BEARER=<path>|MISSING, TRIVY=<path>|MISSING, GITLEAKS=<path>|MISSING
+# Priority: skill-local bin/ → system PATH
+
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BIN="$SKILL_DIR/bin"
+
+for tool in bearer trivy gitleaks; do
+  UPPER=$(echo "$tool" | tr '[:lower:]' '[:upper:]')
+  if [ -x "$BIN/$tool" ]; then
+    echo "${UPPER}=$BIN/$tool"
+  elif command -v "$tool" &>/dev/null; then
+    echo "${UPPER}=$(command -v "$tool")"
+  else
+    echo "${UPPER}=MISSING"
+  fi
+done
