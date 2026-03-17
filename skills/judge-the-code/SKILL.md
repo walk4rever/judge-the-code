@@ -69,9 +69,11 @@ understand-repo  →  philosophy-extractor  →  demon-hunter（规划中）
 
 ### 速度（Speed）— 次优先
 
-- 所有 Agent **并行执行**，不串行等待
-- 优先用单次 `grep` 命令覆盖全库，而不是多次读取单个文件
-- 减少串行工具调用数量
+速度指用户从发出命令到看到有用输出的**整体感知耗时**，包含三层：
+
+- **LLM 推理**：token 少 → 推理快；并行 Agent 而非串行
+- **工具执行**：grep/bash 命令本身要快；未来混合架构（demon-hunter 调用 semgrep/trivy/Go CLI 等）中，优先选择启动快、增量扫描的工具，避免全量深度扫描
+- **感知延迟**：尽早输出中间进度（如进度 banner），让用户知道任务在推进，而不是沉默等待
 
 ### 节省 token（Efficiency）— 最低优先
 
