@@ -8,9 +8,34 @@
 
 ## 步骤
 
-1. 用 Glob 找 5-8 个核心源码文件（排除测试文件、生成文件）：
-   - 优先选 `services/`, `controllers/`, `handlers/`, `core/`, `domain/` 下的文件
-   - 各读前 **60 行**
+1. **提取函数/方法签名**（按语言选择对应命令，覆盖全库而非采样）：
+
+   **TypeScript / JavaScript**：
+   ```bash
+   # 函数和方法签名
+   grep -rn \
+     "^export function\|^export const.*=.*=>\|^export async function\|^\s\+async \|^\s\+public \|^\s\+private \|^\s\+protected " \
+     src/ --include="*.ts" --include="*.js" \
+     | grep -v "node_modules\|\.test\.\|\.spec\.\|dist/" | head -60
+
+   # 类 / 接口 / 类型名
+   grep -rn "^export class\|^class \|^export interface\|^interface \|^export type " \
+     src/ --include="*.ts" \
+     | grep -v "node_modules\|\.test\." | head -30
+   ```
+
+   **Python**：
+   ```bash
+   grep -rn "^def \|^    def \|^async def \|^class " \
+     . --include="*.py" \
+     | grep -v "__pycache__\|test_\|_test\." | head -60
+   ```
+
+   **Go**：
+   ```bash
+   grep -rn "^func \|^type.*struct\|^type.*interface" \
+     . --include="*.go" | grep -v "_test.go" | head -60
+   ```
 
 2. 分析**命名风格**，寻找以下模式：
 
@@ -24,13 +49,31 @@
    | 过度冗长 | `UserAccountInformationService` | 防御性命名，可能过度设计 |
 
 3. 分析**抽象层级**：
-   - 接口/抽象类的数量 vs 具体实现数量（Grep `interface|abstract|Protocol|trait`）
-   - 是否有过度抽象的迹象（5层继承链、每个功能都有接口）
-   - 是否有欠抽象的迹象（大量重复代码、超长函数）
 
-4. 分析**函数/方法规模**（Grep 函数定义，估算平均长度）：
-   - 短函数倾向（< 20行）→ 单一职责意识强
-   - 长函数倾向（> 100行）→ 可能职责混杂
+   ```bash
+   # 统计 interface/abstract 数量
+   grep -rn "^export interface\|^interface \|^abstract class" \
+     src/ --include="*.ts" | grep -v "node_modules\|\.test\." | wc -l
+
+   # 统计 concrete class 数量
+   grep -rn "^export class\|^class " \
+     src/ --include="*.ts" \
+     | grep -v "abstract\|node_modules\|\.test\." | wc -l
+   ```
+
+   - interface 数 / class 数 > 0.5 → 抽象层过重
+   - interface 数 / class 数 < 0.1 → 几乎无抽象，扁平风格
+
+4. 分析**函数规模**：
+
+   ```bash
+   # 统计函数定义行数（相邻两个函数定义之间的行距 ≈ 函数长度）
+   grep -rn "^export function\|^export async function\|^\s\+async \|^def \|^func " \
+     src/ --include="*.ts" --include="*.py" --include="*.go" \
+     | grep -v "node_modules\|\.test\." | wc -l
+   ```
+
+   对比总行数与函数数量，估算平均函数长度。
 
 ## 输出格式
 
@@ -47,13 +90,13 @@
 ### 抽象层级
 [过度抽象 / 适度抽象 / 扁平直接]
 **证据**：
-- 发现 3 个 interface，12 个 concrete class → 抽象比例适中
+- 发现 3 个 interface，12 个 concrete class → 抽象比例适中（0.25）
 - 最深继承链：3 层（可接受）
 **结论**：...
 
 ### 函数规模
 [短函数风格 / 中等 / 长函数风格]
-**证据**：采样的 8 个文件中，函数平均约 [N] 行
+**证据**：共 [N] 个函数，总源码 [M] 行，平均约 [M/N] 行/函数
 **结论**：...
 
 ### 值得关注的命名决策

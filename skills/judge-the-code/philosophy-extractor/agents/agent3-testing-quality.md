@@ -8,11 +8,30 @@
 
 ## 步骤
 
-1. 用 Glob 找测试文件：
+1. **检测测试文件并提取关键信息**（单次命令，无需逐文件读取）：
+
+   ```bash
+   # 统计测试文件总数
+   find . -name "*.test.ts" -o -name "*.spec.ts" -o -name "*_test.go" \
+     -o -name "test_*.py" -o -name "*.test.js" \
+     | grep -v node_modules | wc -l
+
+   # 提取所有测试名称（最能透露测试哲学）
+   grep -rn "^\s*it(\|^\s*test(\|^\s*describe(\|^def test_\|^func Test" \
+     . --include="*.test.ts" --include="*.spec.ts" --include="*_test.go" \
+     --include="test_*.py" --include="*.test.js" \
+     | grep -v node_modules | head -50
+
+   # 统计 mock 使用总量
+   grep -rn "jest\.fn\|vi\.fn\|\.mock(\|sinon\.\|gomock\|unittest\.mock\|MagicMock" \
+     . --include="*.test.ts" --include="*.spec.ts" \
+     | grep -v node_modules | wc -l
+
+   # 检测测试框架类型
+   grep -rn "playwright\|cypress\|supertest\|httptest\|testcontainers" \
+     . --include="*.test.ts" --include="*.spec.ts" --include="*_test.go" \
+     | grep -v node_modules | head -10
    ```
-   **/*.test.ts, **/*.spec.ts, **/*_test.go, **/test_*.py, **/*.test.js
-   ```
-   挑选 3-5 个代表性测试文件，读前 **80 行**。
 
    **如果没有找到任何测试文件**，跳过步骤 2-5，直接输出：
    ```

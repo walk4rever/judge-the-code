@@ -26,7 +26,19 @@
 1. 用 Glob 找候选入口文件（`**/main.*`, `**/index.*`, `**/app.*`, `**/server.*`）
 2. 用 Grep 搜索启动关键词：`"listen\|app.run\|serve\|bootstrap\|StartServer"` 快速定位真正的入口
 3. 读入口文件前 **60 行**（只看初始化部分）
-4. 用 Grep 搜索 `import|require` 识别被频繁引用的核心模块（**不要读这些模块**，只记录路径）
+4. **统计最高频被引用的模块**（找到核心模块而不是随机挑文件）：
+
+   ```bash
+   # 提取所有 import/require 路径并按频率排序
+   grep -rn "from ['\"]\..*['\"]\|require(['\"]\..*['\"])" \
+     src/ --include="*.ts" --include="*.js" \
+     | grep -v "node_modules\|\.test\.\|\.spec\." \
+     | sed "s/.*from ['\"]//;s/['\"].*//;s/.*require(['\"]//;s/['\"].*//" \
+     | sort | uniq -c | sort -rn | head -15
+   ```
+
+   被引用次数最多的路径 = 项目最核心的模块，优先作为学习路径的起点。
+
 5. **不要递归追踪调用链**——只记录"核心业务逻辑在哪个目录"即可
 
 ## 输出格式
