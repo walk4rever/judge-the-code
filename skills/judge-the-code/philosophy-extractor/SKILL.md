@@ -51,10 +51,28 @@ version: 1.1.0
 
 ### Phase 0：准备上下文
 
-1. **输入验证**（路径异常时立即停止并提示）：
-   - 路径为空 → `❌ 请提供项目路径，例如：/philosophy-extractor .`
-   - 路径不存在 → `❌ 路径 {path} 不存在`
-   - 路径是文件 → `❌ {path} 是文件，请提供项目根目录`
+1. **输入验证** — 运行以下 bash 命令，根据返回值决定是否继续：
+
+   ```bash
+   TARGET="{用户提供的路径}"
+
+   if [ -z "$TARGET" ]; then
+     echo "EMPTY"
+   elif [ ! -e "$TARGET" ]; then
+     echo "NOT_FOUND"
+   elif [ -f "$TARGET" ]; then
+     echo "IS_FILE"
+   elif [ -d "$TARGET" ]; then
+     echo "OK"
+   fi
+   ```
+
+   **根据输出立即处理，异常情况必须 STOP，不得继续执行后续步骤：**
+
+   - **`EMPTY`** → 输出后停止：`❌ 请提供项目路径，例如：/philosophy-extractor .`
+   - **`NOT_FOUND`** → 输出后停止：`❌ 路径 {path} 不存在，请检查路径是否正确。`
+   - **`IS_FILE`** → 输出后停止：`❌ {path} 是一个文件，请提供项目根目录路径。`
+   - **`OK`** → 继续执行步骤 2
 
 2. **检查是否有 `UNDERSTANDING.md`**（understand-repo 的输出）：
    - **存在** → 读取全文作为背景上下文，**直接跳到 Phase 1**
