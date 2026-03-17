@@ -40,6 +40,38 @@
 
 ---
 
+## 用户环境多样性分析
+
+demon-hunter 需要在以下所有环境下可用：
+
+| 维度 | 需要覆盖的情况 |
+|------|-------------|
+| **操作系统** | macOS (Intel x86_64 / Apple Silicon arm64) · Linux (Ubuntu/Alpine/Fedora...) · WSL2 |
+| **架构** | x86_64(amd64) · arm64/aarch64 · 未来可能的 arm/v7 |
+| **包管理器** | brew(macOS only) · apt/yum/apk · 或完全没有 |
+| **Python 环境** | 有 Python ≥ 3.9 · 有 uv · 有 pipx · 无任何 Python 工具 |
+| **网络** | 直连 · 企业代理 · 离线/受限 |
+| **权限** | 完整权限 · 无 sudo（企业机器常见）|
+
+**核心矛盾**：
+
+- `trivy` / `gitleaks` 是 **Go 单二进制**，覆盖所有 OS+arch，直接下载，问题最小
+- `semgrep` **无独立二进制**（仅 pip 分发），是最大的环境多样性风险
+
+**semgrep 在各环境的可用性**：
+
+| 安装方式 | macOS | Linux | WSL2 | 无 Python | 无网络 |
+|---------|:-----:|:-----:|:----:|:---------:|:------:|
+| `uvx semgrep` | ✅ 若有 uv | ✅ 若有 uv | ✅ 若有 uv | ✅ uv 自带 Python | ❌ |
+| `pip install` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `brew install` | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `docker run` | ✅ 若有 Docker | ✅ | ✅ | ✅ | ❌ |
+| **skill 内置 venv** | ✅ 需 Python | ✅ 需 Python | ✅ 需 Python | ❌ | ❌ |
+
+**结论**：没有任何一种方式能覆盖所有环境。必须使用**有序 fallback 链**。
+
+---
+
 ## 隔离执行策略
 
 ### 核心原则
@@ -96,25 +128,102 @@ curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitle
           "需要安装 uv（推荐）或 semgrep：brew install uv"
 ```
 
-### 执行入口
+### trivy / gitleaks 的二进制下载策略
+
+Go 单二进制，按 OS + arch 自动选择正确包：
 
 ```bash
-# SKILL_DIR/bin/find-tools（参考 gstack/browse/bin/find-browse）
-SKILL_DIR=$(find ~/.agents/skills ~/.claude/skills \
-  -name "SKILL.md" -path "*/demon-hunter/*" 2>/dev/null \
-  | head -1 | xargs dirname)
+OS=$(uname -s)    # Darwin | Linux
+ARCH=$(uname -m)  # x86_64 | arm64 | aarch64
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"   # Linux arm64 归一化
 
-TRIVY="$SKILL_DIR/bin/trivy"
-GITLEAKS="$SKILL_DIR/bin/gitleaks"
+# trivy 命名规则: trivy_VERSION_macOS-64bit.tar.gz / trivy_VERSION_Linux-ARM64.tar.gz
+# gitleaks 命名规则: gitleaks_VERSION_darwin_arm64.tar.gz / gitleaks_VERSION_linux_x64.tar.gz
+```
 
-# semgrep 按优先级
-if command -v uvx &>/dev/null; then
-  SEMGREP="uvx semgrep"
-elif [ -x "$SKILL_DIR/.venv/bin/semgrep" ]; then
-  SEMGREP="$SKILL_DIR/.venv/bin/semgrep"
-else
-  SEMGREP=""  # 触发安装提示
-fi
+覆盖矩阵：
+
+| OS | arch | trivy 包名 | gitleaks 包名 |
+|----|------|-----------|--------------|
+| macOS | x86_64 | `macOS-64bit` | `darwin_x64` |
+| macOS | arm64 | `macOS-ARM64` | `darwin_arm64` |
+| Linux | x86_64 | `Linux-64bit` | `linux_x64` |
+| Linux | arm64 | `Linux-ARM64` | `linux_arm64` |
+
+### semgrep 的有序 fallback 链
+
+```
+检测顺序（优先使用隔离方式，最后才是系统级安装）：
+
+1. SKILL_DIR/.venv/bin/semgrep  → 之前已在 skill 内创建过 venv（最优：完全隔离，无需网络）
+2. uvx semgrep                  → uv 已安装（优秀：隔离，自动管理）
+3. pipx run semgrep             → pipx 已安装（良好：隔离）
+4. docker run semgrep/semgrep   → Docker 已安装（可用：完全隔离）
+5. python3 -m semgrep           → semgrep 已用 pip 装过（可用：系统级）
+6. semgrep                      → 系统 PATH 中有（可用）
+7. → 触发安装引导               → 根据检测到的可用工具给出建议
+```
+
+### 安装引导（fallback 最终兜底）
+
+当 semgrep 完全不可用时，给出环境感知的建议而非一条命令：
+
+```
+⚠️ 未找到 semgrep，SAST 扫描将跳过。
+
+检测到你的环境：
+  ✅ uv 已安装  →  推荐：一次性运行 `uv tool install semgrep`
+  ✅ Python 3.x →  备选：`pip install --user semgrep`
+  ❌ brew 未安装
+
+其余扫描（trivy + gitleaks）继续执行。
+```
+
+### 整体执行入口（find-tools 脚本）
+
+```bash
+#!/usr/bin/env bash
+# SKILL_DIR/bin/find-tools
+# 输出各工具的可执行路径，供 SKILL.md 引用
+
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BIN="$SKILL_DIR/bin"
+
+# trivy
+if [ -x "$BIN/trivy" ]; then echo "TRIVY=$BIN/trivy"
+elif command -v trivy &>/dev/null; then echo "TRIVY=$(command -v trivy)"
+else echo "TRIVY=MISSING"; fi
+
+# gitleaks
+if [ -x "$BIN/gitleaks" ]; then echo "GITLEAKS=$BIN/gitleaks"
+elif command -v gitleaks &>/dev/null; then echo "GITLEAKS=$(command -v gitleaks)"
+else echo "GITLEAKS=MISSING"; fi
+
+# semgrep（有序 fallback）
+if [ -x "$SKILL_DIR/.venv/bin/semgrep" ]; then echo "SEMGREP=$SKILL_DIR/.venv/bin/semgrep"
+elif command -v uvx &>/dev/null; then echo "SEMGREP=uvx semgrep"
+elif command -v pipx &>/dev/null; then echo "SEMGREP=pipx run semgrep"
+elif command -v docker &>/dev/null; then echo "SEMGREP=docker run --rm -v \$(pwd):/src semgrep/semgrep"
+elif command -v semgrep &>/dev/null; then echo "SEMGREP=$(command -v semgrep)"
+else echo "SEMGREP=MISSING"; fi
+```
+
+### 缺失工具的处理原则
+
+**不因某个工具缺失而整体失败**，而是：
+
+1. 输出哪些维度被跳过及原因
+2. 给出针对当前环境的安装建议
+3. 已可用的工具继续扫描，输出部分结果
+
+```
+🔍 demon-hunter 扫描报告
+
+✅ 依赖 CVE 扫描 (trivy)      — 完成，发现 3 个高危漏洞
+✅ Git 密钥扫描 (gitleaks)    — 完成，未发现泄漏
+⚠️ 代码漏洞扫描 (semgrep)    — 已跳过（未安装）
+   → 安装建议：uv tool install semgrep
+✅ 设计陷阱分析 (Claude)      — 完成，发现 2 个隐患
 ```
 
 ---
