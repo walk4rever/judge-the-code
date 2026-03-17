@@ -49,8 +49,8 @@ Taste（欣赏力）                    Judgment（判断力）
 ├──────────────────────────┬──────────────────────────────────┤
 │    Skill 层（Claude）     │      Tool 层（Go CLI）            │
 ├──────────────────────────┼──────────────────────────────────┤
-│  understand-repo         │                                  │
-│  philosophy-extractor    │                                  │
+│  code-explore         │                                  │
+│  design-lens    │                                  │
 │                          │                                  │
 │  demon-hunter ←──────────┼── semgrep / npm audit / trivy   │
 │  • 解读扫描结果           │   确定性扫描，CVE 数据库支撑      │
@@ -66,14 +66,14 @@ Taste（欣赏力）                    Judgment（判断力）
 
 | 组件 | 形态 | 作用 | 状态 |
 |------|------|------|------|
-| `understand-repo` | Skill | 建立代码库全局认知（结构、技术栈、入口、依赖） | ✅ 可用 |
-| `philosophy-extractor` | Skill | 提取设计哲学与关键决策，找到值得学习和质疑的地方 | ✅ 可用 |
+| `code-explore` | Skill | 建立代码库全局认知（结构、技术栈、入口、依赖） | ✅ 可用 |
+| `design-lens` | Skill | 提取设计哲学与关键决策，找到值得学习和质疑的地方 | ✅ 可用 |
 | `demon-hunter` | Skill + 工具 | 发现安全漏洞、依赖 CVE、密钥泄漏、性能隐患、设计陷阱 | ✅ 可用 |
 
 三个组件组合使用，构成完整的 `judge-the-code` 工作流：
 
 ```
-understand-repo  →  philosophy-extractor  →  demon-hunter
+code-explore  →  design-lens  →  demon-hunter
 "这个项目长什么样"    "哪里设计得好，为什么"      "哪里有恶魔"
      结构层                 欣赏层                  判断层
 ```
@@ -84,13 +84,13 @@ understand-repo  →  philosophy-extractor  →  demon-hunter
 
 ```bash
 # 第一步：理解项目结构
-/understand-repo .
+/code-explore .
 
 # 第二步：提取设计哲学（规划中）
-/philosophy-extractor .
+/design-lens .
 
 # 第二步：提炼设计哲学
-/philosophy-extractor .
+/design-lens .
 
 # 第三步：猎杀恶魔
 /demon-hunter .
@@ -105,7 +105,7 @@ understand-repo  →  philosophy-extractor  →  demon-hunter
 cp -r skills/judge-the-code ~/.agents/skills/
 ```
 
-所有子 skill（`understand-repo`、`philosophy-extractor` 等）会被自动发现。
+所有子 skill（`code-explore`、`design-lens` 等）会被自动发现。
 
 > ⚠️ **升级提示**：每次更新后重新执行 cp 即可覆盖旧版本。
 

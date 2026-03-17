@@ -1,5 +1,5 @@
 ---
-name: philosophy-extractor
+name: design-lens
 description: >-
   提取代码库的设计哲学与关键决策。通过分析命名风格、抽象层级、错误处理、
   测试取向、依赖选择等维度，找出这个代码库隐含的"设计信仰"——
@@ -7,7 +7,7 @@ description: >-
   TRIGGER when: 用户想学习一个项目的设计思路、评估代码质量、
   或说了"这个项目设计得怎么样"、"有什么值得学的"、"哪里设计得好"、
   "帮我提炼一下这个项目的设计哲学"。
-  DO NOT TRIGGER when: 用户只想理解项目结构（用 understand-repo），
+  DO NOT TRIGGER when: 用户只想理解项目结构（用 code-explore），
   或只想找安全漏洞（用 demon-hunter）。
 origin: judge-the-code
 version: 1.1.0
@@ -28,9 +28,9 @@ version: 1.1.0
 ## 调用方式
 
 ```
-/philosophy-extractor <项目路径>
-/philosophy-extractor .
-/philosophy-extractor ~/projects/some-repo
+/design-lens <项目路径>
+/design-lens .
+/design-lens ~/projects/some-repo
 ```
 
 ---
@@ -39,10 +39,10 @@ version: 1.1.0
 
 > **核心策略：有目的地采样源码，找模式而非读实现。**
 
-1. **优先复用** `UNDERSTANDING.md`：如果 understand-repo 已运行过，直接读取，跳过重复分析
+1. **优先复用** `.judge-the-code/understanding.md`：如果 code-explore 已运行过，直接读取，跳过重复分析
 2. **Grep 先于 Read**：用关键词定位典型代码片段，不要盲目读整个文件
 3. **采样而非全读**：每个维度只读 3-5 个代表性文件，每文件最多 80 行
-4. **测试文件是宝藏**：这里 **允许** 读测试文件（understand-repo 明确禁止），测试命名和结构最能透露设计取向
+4. **测试文件是宝藏**：这里 **允许** 读测试文件（code-explore 明确禁止），测试命名和结构最能透露设计取向
 5. **禁止读取**：生成文件（`dist/`, `build/`）、依赖包（`node_modules/`, `vendor/`）、二进制文件
 
 ---
@@ -69,19 +69,19 @@ version: 1.1.0
 
    **根据输出立即处理，异常情况必须 STOP，不得继续执行后续步骤：**
 
-   - **`EMPTY`** → 输出后停止：`❌ 请提供项目路径，例如：/philosophy-extractor .`
+   - **`EMPTY`** → 输出后停止：`❌ 请提供项目路径，例如：/design-lens .`
    - **`NOT_FOUND`** → 输出后停止：`❌ 路径 {path} 不存在，请检查路径是否正确。`
    - **`IS_FILE`** → 输出后停止：`❌ {path} 是一个文件，请提供项目根目录路径。`
    - **`OK`** → 继续执行步骤 2
 
-2. **检查是否有 `UNDERSTANDING.md`**（understand-repo 的输出）：
+2. **检查是否有 `.judge-the-code/understanding.md`**（code-explore 的输出）：
    - **存在** → 读取全文作为背景上下文，**直接跳到 Phase 1**
    - **不存在** → 快速读取 `package.json` / `go.mod` / `pyproject.toml` 等识别语言和框架（最多读 2 个文件，各 50 行），然后进入 Phase 1
 
 3. **确定 skill 目录路径**（供各 Agent 加载详细规格）：
 
    ```bash
-   find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/philosophy-extractor/*" 2>/dev/null \
+   find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/design-lens/*" 2>/dev/null \
      | head -1 | xargs dirname
    ```
 
@@ -137,12 +137,12 @@ version: 1.1.0
 - 不确定时用 ✅，宁可保守也不随意打 ❌
 - 每条必须有**具体证据**（文件路径 + 代码片段），不能只有结论
 
-#### Step 2：生成 PHILOSOPHY.md
+#### Step 2：生成 .judge-the-code/philosophy.md
 
 ```markdown
 # [项目名] — 设计哲学报告
 
-> 生成时间: [date] | 分析工具: philosophy-extractor
+> 生成时间: [date] | 分析工具: design-lens
 
 ## 这个代码库的"人格"
 
@@ -226,11 +226,11 @@ version: 1.1.0
 | **整体设计品味** | **⭐⭐⭐⭐☆** | **务实、克制、有意识的简洁** |
 ```
 
-保存到项目根目录的 `PHILOSOPHY.md`。
+保存到`.judge-the-code/philosophy.md`。
 
 **保存完成后，输出：**
 ```
-📄 PHILOSOPHY.md 已生成
+📄 .judge-the-code/philosophy.md 已生成
 
 进入互动模式，你可以继续问：
 - "为什么 [某个决策] 被标记为存疑？"
@@ -242,7 +242,7 @@ version: 1.1.0
 
 ### Phase 3：深度问答模式
 
-生成完 `PHILOSOPHY.md` 后，进入**设计讨论模式**。
+生成完 `.judge-the-code/philosophy.md` 后，进入**设计讨论模式**。
 
 **处理用户追问时的原则：**
 
@@ -272,8 +272,8 @@ version: 1.1.0
 ## 示例调用
 
 ```
-/philosophy-extractor .
-/philosophy-extractor ~/projects/fastapi
+/design-lens .
+/design-lens ~/projects/fastapi
 这个项目的设计怎么样？
 这个代码库有什么值得学的？
 ```

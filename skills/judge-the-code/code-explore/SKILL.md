@@ -1,9 +1,9 @@
 ---
-name: understand-repo
+name: code-explore
 description: >-
   帮助普通技术人快速理解一个陌生的 GitHub 项目。通过 5 个并行分析 Agent，从技术栈、
   架构设计、入口流程、依赖意图、开发环境五个维度深度分析代码库，
-  最终生成结构化的《项目理解指南》(UNDERSTANDING.md)，并进入交互式答疑模式。
+  最终生成结构化的《项目理解指南》(.judge-the-code/understanding.md)，并进入交互式答疑模式。
   TRIGGER when: 用户想理解、学习、研究一个 clone 下来的 GitHub 项目，
   或说了"帮我看看这个项目"、"分析这个仓库"、"这个项目怎么工作的"。
   DO NOT TRIGGER when: 用户只想修改或调试某个具体文件。
@@ -23,9 +23,9 @@ version: 1.3.0
 ## 调用方式
 
 ```
-/understand-repo <项目路径>
-/understand-repo /path/to/cloned/project
-/understand-repo .   (当前目录)
+/code-explore <项目路径>
+/code-explore /path/to/cloned/project
+/code-explore .   (当前目录)
 ```
 
 ---
@@ -80,8 +80,8 @@ version: 1.3.0
    - **`EMPTY`** → 输出后停止：
      ```
      ❌ 请提供项目路径，例如：
-        /understand-repo .              （当前目录）
-        /understand-repo ~/projects/my-repo
+        /code-explore .              （当前目录）
+        /code-explore ~/projects/my-repo
      ```
    - **`NOT_FOUND`** → 输出后停止：
      ```
@@ -93,7 +93,7 @@ version: 1.3.0
      ```
    - **`OK`** → 继续执行步骤 2
 
-2. **检查是否存在 `.repo-context/PROGRESS.md`**（之前会话留下的状态）：
+2. **检查是否存在 `.judge-the-code/state/progress.md`**（之前会话留下的状态）：
 
    **如果不存在** → 直接进入 Phase 1 全量分析
 
@@ -109,12 +109,12 @@ version: 1.3.0
 
    **分支 A：是 git 仓库** → 比较 commit hash：
 
-   - hash 与 `PROGRESS.md` 中 `analyzed_at_commit` 相同 → 直接恢复
+   - hash 与 `state/progress.md` 中 `analyzed_at_commit` 相同 → 直接恢复
    - hash 不同 → 执行 diff 分析：
      ```bash
      git diff --stat {stored_commit}..HEAD
      ```
-     交叉比对变更文件 vs `KNOWLEDGE.md` 已探索文件：
+     交叉比对变更文件 vs `state/knowledge.md` 已探索文件：
 
      | 类别 | 处理方式 |
      |------|---------|
@@ -124,10 +124,10 @@ version: 1.3.0
 
    **分支 B：非 git 仓库**（zip 解压、无版本控制）→ 用时间戳判断：
 
-   - 比较 `PROGRESS.md` 中的 `analyzed_at` 时间戳 vs 项目文件的最新修改时间：
+   - 比较 `state/progress.md` 中的 `analyzed_at` 时间戳 vs 项目文件的最新修改时间：
      ```bash
-     find . -newer .repo-context/PROGRESS.md -type f \
-       ! -path './.repo-context/*' ! -path './node_modules/*' \
+     find . -newer .judge-the-code/state/progress.md -type f \
+       ! -path './.judge-the-code/state/*' ! -path './node_modules/*' \
        ! -path './.git/*' | head -20
      ```
    - 如有文件比上次分析时间更新 → 提示用户："检测到文件有变动（非 git 项目，无法精确 diff）"
@@ -156,9 +156,9 @@ version: 1.3.0
 
    **选择 [U] 局部更新时的执行逻辑：**
 
-   - 对每个 `⚠️ STALE` 文件：用 `git diff {stored_commit}..HEAD -- {文件路径}` 读取 diff（不读整文件），理解"改了什么"，更新 `KNOWLEDGE.md` 对应条目
-   - 若 `package.json` 变更：单独重跑 Agent 4（依赖分析），更新 `KNOWLEDGE.md` 的依赖部分
-   - 若目录结构有新增/删除：更新 `PROGRESS.md` 的路径规划
+   - 对每个 `⚠️ STALE` 文件：用 `git diff {stored_commit}..HEAD -- {文件路径}` 读取 diff（不读整文件），理解"改了什么"，更新 `state/knowledge.md` 对应条目
+   - 若 `package.json` 变更：单独重跑 Agent 4（依赖分析），更新 `state/knowledge.md` 的依赖部分
+   - 若目录结构有新增/删除：更新 `state/progress.md` 的路径规划
    - **不重跑**未变更维度的 Agent
 
    > **核心原则**：用 `git diff` 而不是重读整个文件。一个 200 行文件的 diff 通常只有 20-30 行，
@@ -173,7 +173,7 @@ version: 1.3.0
 **启动前，确定 skill 目录路径**（供各 Agent 加载详细规格）：
 
 ```bash
-find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/understand-repo/*" 2>/dev/null \
+find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/code-explore/*" 2>/dev/null \
   | head -1 | xargs dirname
 ```
 
@@ -210,12 +210,12 @@ find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/understand-repo
 
 ### Phase 2：综合输出
 
-收集所有 5 个 Agent 的结果后，生成完整的 `UNDERSTANDING.md`：
+收集所有 5 个 Agent 的结果后，生成完整的 `.judge-the-code/understanding.md`：
 
 ```markdown
 # [项目名] — 项目理解指南
 
-> 生成时间: [date] | 分析工具: understand-repo skill
+> 生成时间: [date] | 分析工具: code-explore skill
 
 ## TL;DR（30秒了解）
 [2-3 句话：这是什么项目，解决什么问题，核心价值是什么]
@@ -270,20 +270,20 @@ A: [如果项目有认证的话]
 A: [基于架构给出步骤]
 ```
 
-保存文件到项目根目录的 `UNDERSTANDING.md`。
+保存文件到`.judge-the-code/understanding.md`。
 
 **保存完成后，输出：**
 ```
-📄 UNDERSTANDING.md 已生成
+📄 .judge-the-code/understanding.md 已生成
 ```
 
 同时初始化状态目录（如不存在则创建）：
 
 ```bash
-mkdir -p .repo-context
+mkdir -p .judge-the-code/state
 ```
 
-写入 `.repo-context/PROGRESS.md`（初始状态）：
+写入 `.judge-the-code/state/progress.md`（初始状态）：
 
 ```markdown
 ---
@@ -312,7 +312,7 @@ current_step: 0
 - 路径 C — [名称]: 未开始
 ```
 
-写入 `.repo-context/KNOWLEDGE.md`（初始为空，后续增量追加）：
+写入 `.judge-the-code/state/knowledge.md`（初始为空，后续增量追加）：
 
 ```markdown
 ---
@@ -332,7 +332,7 @@ files_explored: 0
 - **可用命令**: dev, build, test, lint
 ```
 
-写入 `.repo-context/NOTES.md`（记录 Q&A 洞察）：
+写入 `.judge-the-code/state/notes.md`（记录 Q&A 洞察）：
 
 ```markdown
 ---
@@ -349,7 +349,7 @@ qa_count: 0
 
 ### Phase 3：渐进式深度学习模式
 
-生成完 `UNDERSTANDING.md` 后，进入**渐进式学习模式**。
+生成完 `.judge-the-code/understanding.md` 后，进入**渐进式学习模式**。
 
 #### 3.1 提供学习路径菜单
 
@@ -358,7 +358,7 @@ qa_count: 0
 > **注意**：以下是示例输出（基于 Node.js/Express 项目）。实际路径和文件名由 Phase 1 分析结果动态生成，Go/Python/Java 等项目的路径会完全不同。
 
 ```
-✅ 分析完成！UNDERSTANDING.md 已生成。
+✅ 分析完成！.judge-the-code/understanding.md 已生成。
 
 根据这个项目的结构，我为你准备了几条学习路径，选一条开始？
 
@@ -444,7 +444,7 @@ qa_count: 0
 
 **每当读取一个新的源码文件后**，立即更新状态文件：
 
-**更新 `.repo-context/PROGRESS.md`**：
+**更新 `.judge-the-code/state/progress.md`**：
 ```markdown
 ## 已探索文件
 
@@ -462,7 +462,7 @@ qa_count: 0
   - ⬜ src/repositories/UserRepo.ts
 ```
 
-**更新 `.repo-context/KNOWLEDGE.md`**（追加新文件的理解摘要）：
+**更新 `.judge-the-code/state/knowledge.md`**（追加新文件的理解摘要）：
 ```markdown
 ### src/controllers/UserController.ts
 - **status**: ✅ current（analyzed at commit a3f7c21）
@@ -478,7 +478,7 @@ qa_count: 0
 > - `✅ current` — 与当前 HEAD 一致
 > - `⚠️ stale (commit d9e2b84 改动了此文件)` — 需要在下次访问时更新
 
-**每当 Q&A 产生重要洞察后**，追加到 `.repo-context/NOTES.md`：
+**每当 Q&A 产生重要洞察后**，追加到 `.judge-the-code/state/notes.md`：
 ```markdown
 ### Q: 中间件的执行顺序是怎么决定的？
 **时间**: 2026-03-14 16:50 | **触发文件**: src/middleware/
@@ -492,16 +492,16 @@ qa_count: 0
 在每次回答末尾，显示当前的探索状态（简洁一行）：
 
 ```
-📊 已探索: 5个文件 | 路径 A 进度: 2/4 | 状态已保存至 .repo-context/
+📊 已探索: 5个文件 | 路径 A 进度: 2/4 | 状态已保存至 .judge-the-code/state/
 ```
 
 #### 3.6 会话恢复流程（Phase 0 选择 R 时）
 
 加载三个状态文件后，直接恢复到中断位置：
 
-1. 读取 `PROGRESS.md`：得知上次路径、步骤、已探索文件列表
-2. 读取 `KNOWLEDGE.md`：恢复对已探索文件的完整理解（**不重新读源码**）
-3. 读取 `NOTES.md`：恢复 Q&A 上下文
+1. 读取 `state/progress.md`：得知上次路径、步骤、已探索文件列表
+2. 读取 `state/knowledge.md`：恢复对已探索文件的完整理解（**不重新读源码**）
+3. 读取 `state/notes.md`：恢复 Q&A 上下文
 4. 向用户确认："上次你在学习路径 A 的第 2 步，我们从 `UserController.ts` 继续？"
 5. 继续执行，**跳过 Phase 1 的全量分析**
 
@@ -518,22 +518,21 @@ qa_count: 0
 
 ---
 
-## .repo-context 目录说明
+## .judge-the-code/ 目录说明
 
-`.repo-context/` 是 understand-repo skill 的**持久化工作记忆**，存储在被分析项目的根目录。
+`.judge-the-code/state/` 是 code-explore skill 的**持久化工作记忆**，存储在被分析项目的根目录。
 
 | 文件 | 内容 | 更新时机 |
 |------|------|---------|
-| `PROGRESS.md` | 当前路径、步骤、已探索文件列表 | 每次读取新文件后 |
-| `KNOWLEDGE.md` | 每个已读文件的理解摘要 | 每次读取新文件后 |
-| `NOTES.md` | Q&A 洞察、关键结论 | 每次问答产生重要发现后 |
-| `UNDERSTANDING.md` | Phase 2 生成的全局概览 | Phase 2 完成时一次性写入 |
+| `state/progress.md` | 当前路径、步骤、已探索文件列表 | 每次读取新文件后 |
+| `state/knowledge.md` | 每个已读文件的理解摘要 | 每次读取新文件后 |
+| `state/notes.md` | Q&A 洞察、关键结论 | 每次问答产生重要发现后 |
+| `.judge-the-code/understanding.md` | Phase 2 生成的全局概览 | Phase 2 完成时一次性写入 |
 
 **关于版本控制**：在分析开始时，如果项目有 `.gitignore`，建议（但不强制）追加：
 ```
-# AI 学习辅助文件
-.repo-context/
-UNDERSTANDING.md
+# judge-the-code 分析产物
+.judge-the-code/
 ```
 
 ---
@@ -552,8 +551,8 @@ UNDERSTANDING.md
 ## 示例调用
 
 ```
-/understand-repo .
-/understand-repo ~/projects/some-cloned-repo
+/code-explore .
+/code-explore ~/projects/some-cloned-repo
 帮我理解一下这个项目 /path/to/repo
 这个项目是怎么工作的？
 ```

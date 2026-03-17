@@ -10,15 +10,15 @@
 AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的基础设施。
 
 三层能力：
-1. **结构层** — 快速建立代码库全局认知（`understand-repo`，已有）
-2. **欣赏层** — 提取设计哲学与关键决策（`philosophy-extractor`，规划中）
+1. **结构层** — 快速建立代码库全局认知（`code-explore`，已有）
+2. **欣赏层** — 提取设计哲学与关键决策（`design-lens`，规划中）
 3. **判断层** — 发现安全漏洞、性能隐患、设计陷阱（`demon-hunter`，规划中）
 
 ---
 
 ## 执行计划
 
-### P1 - 本周（understand-repo 可视化升级）
+### P1 - 本周（code-explore 可视化升级）
 
 > 目标：让结构层的输出更有力，为后续判断层提供更好的上下文
 
@@ -83,22 +83,22 @@ AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的
 
 ---
 
-### P2 - 下月（philosophy-extractor）
+### P2 - 下月（design-lens）
 
-#### 4. `philosophy-extractor` Skill 设计与实现
+#### 4. `design-lens` Skill 设计与实现
 - **What**: 新 skill，提取代码库的设计哲学、关键决策和值得学习的地方
 - **Why**: 这是 judge-the-code 的核心差异化——现在没有任何工具做这件事
 - **How**:
   - 4 个并行 Agent：命名与抽象哲学 / 错误处理取向 / 测试与质量信仰 / 架构决策考古
   - 决策评价标签：🔮 精妙 / ✅ 合理 / ⚠️ 存疑 / ❌ 反模式
   - 输出：`PHILOSOPHY.md`（设计决策清单 + 隐含原则 + 值得偷走的模式）
-  - 复用 `UNDERSTANDING.md`（如果已运行 understand-repo）节省 token
+  - 复用 `UNDERSTANDING.md`（如果已运行 code-explore）节省 token
 - **验收**: 对已知项目（如 Express、FastAPI）能输出有洞察的设计决策分析
 - **Effort**: L
 - **Status**: ✅ 完成（v0.3.0）
 
 #### 5. 拆分多文件 skill 结构
-- **What**: 将 understand-repo 的单一 800+ 行 SKILL.md 拆分为多文件
+- **What**: 将 code-explore 的单一 800+ 行 SKILL.md 拆分为多文件
 - **Why**: 加入新 Agent 后文件会更长，维护困难
 - **How**:
   - 先调研 Claude Code 是否支持 skill 内多文件引用
@@ -135,12 +135,12 @@ AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的
   - 已知 CVE 依赖漏洞 ← 工具层检测
   - 性能时间炸弹（N+1、无索引大表查询）← Skill 检测
   - 隐性耦合（表面解耦，实际全局状态依赖）← Skill 检测
-  - 哲学破坏（违背项目既有设计原则）← Skill 检测（依赖 philosophy-extractor 输出）
+  - 哲学破坏（违背项目既有设计原则）← Skill 检测（依赖 design-lens 输出）
   - 陷阱 API（容易用错且用错不报错）← Skill 检测
   - 债务炸弹（牵一发动全身的脆弱区域）← Skill 检测
 - **分发**: `go install github.com/judge-the-code/demon-hunter@latest`
 - **Effort**: XL
-- **Depends on**: philosophy-extractor 完成 + Go CLI 设计完成
+- **Depends on**: design-lens 完成 + Go CLI 设计完成
 
 ---
 
@@ -151,10 +151,10 @@ judge-the-code/
 ├── skills/
 │   └── judge-the-code/          # 单目录安装，cp -r 到 ~/.agents/skills/
 │       ├── SKILL.md             # 顶层索引，说明整体工作流
-│       ├── understand-repo/     # Skill，纯 markdown
+│       ├── code-explore/     # Skill，纯 markdown
 │       │   ├── SKILL.md
 │       │   └── agents/          # 各维度 Agent 规格（多文件结构）
-│       ├── philosophy-extractor/ # Skill，纯 markdown
+│       ├── design-lens/ # Skill，纯 markdown
 │       │   ├── SKILL.md
 │       │   └── agents/
 │       └── demon-hunter/        # Skill，调用 Go CLI
@@ -176,7 +176,7 @@ judge-the-code/
 - **影响**: README、TODO、skill 描述全部更新
 
 ### 2026-03-16: 三层架构
-- **决策**: 结构层（understand-repo）+ 欣赏层（philosophy-extractor）+ 判断层（demon-hunter）
+- **决策**: 结构层（code-explore）+ 欣赏层（design-lens）+ 判断层（demon-hunter）
 - **理由**: 判断力建立在理解之上，理解建立在结构之上，不能跳步
 
 ### 2026-03-16: 陪伴式优于文档式

@@ -1,6 +1,6 @@
 # Agent 2 — 架构分析师 (Architecture Mapper)
 
-> 归属：`understand-repo` skill，Phase 1 并行分析之一。
+> 归属：`code-explore` skill，Phase 1 并行分析之一。
 
 ## 任务
 

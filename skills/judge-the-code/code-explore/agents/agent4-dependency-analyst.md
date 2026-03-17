@@ -1,6 +1,6 @@
 # Agent 4 — 依赖分析师 (Dependency Analyst)
 
-> 归属：`understand-repo` skill，Phase 1 并行分析之一。
+> 归属：`code-explore` skill，Phase 1 并行分析之一。
 
 ## 任务
 

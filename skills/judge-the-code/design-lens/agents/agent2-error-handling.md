@@ -1,6 +1,6 @@
 # Agent 2 — 错误处理取向分析师
 
-> 归属：`philosophy-extractor` skill，Phase 1 并行分析之一。
+> 归属：`design-lens` skill，Phase 1 并行分析之一。
 
 ## 任务
 

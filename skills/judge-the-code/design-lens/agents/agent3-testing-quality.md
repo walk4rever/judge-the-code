@@ -1,6 +1,6 @@
 # Agent 3 — 测试与质量信仰分析师
 
-> 归属：`philosophy-extractor` skill，Phase 1 并行分析之一。
+> 归属：`design-lens` skill，Phase 1 并行分析之一。
 
 ## 任务
 

@@ -1,6 +1,6 @@
 # Agent 1 — 命名与抽象哲学分析师
 
-> 归属：`philosophy-extractor` skill，Phase 1 并行分析之一。
+> 归属：`design-lens` skill，Phase 1 并行分析之一。
 
 ## 任务
 
