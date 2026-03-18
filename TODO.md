@@ -9,10 +9,11 @@
 
 AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的基础设施。
 
-三层能力：
+四层能力：
 1. **结构层** — 快速建立代码库全局认知（`code-explore`，已有）
-2. **欣赏层** — 提取设计哲学与关键决策（`design-lens`，规划中）
-3. **判断层** — 发现安全漏洞、性能隐患、设计陷阱（`demon-hunter`，规划中）
+2. **欣赏层** — 提取设计哲学与关键决策（`design-lens`，已有）
+3. **判断层** — 发现安全漏洞、性能隐患、设计陷阱（`demon-hunter`，已有）
+4. **经济层** — 发现 Token 浪费与隐患（`token-optimize`，已有）
 
 ---
 
@@ -142,6 +143,23 @@ AI 写代码，人类判断代码。`judge-the-code` 是人类保持判断力的
 - **Effort**: XL
 - **Depends on**: design-lens 完成 + Go CLI 设计完成
 
+### P4 - 进行中（code-explore 确定性混合架构升级）
+
+#### 8. code-explore 引入确定性底层工具链
+- **What**: 将 `code-explore` 的 5 个 Agent 从“正则/Glob + 纯 LLM 盲猜”升级为“顶级确定性二进制工具 + LLM 语义总结”的混合架构。
+- **Why**: 纯 Prompt 方式在复杂项目（如 Monorepo、多语言、别名路径）中极不可靠、上下文浪费严重且天花板极低。利用确定性工具可以实现 100% 的准确率并降本提速。
+- **工具链选型**:
+  - `enry` (Go): 毫秒级语言占比识别（替代 `package.json` 盲猜）
+  - `syft` (Go): 一键生成 SBOM 依赖树（替代正则表达式）
+  - `scc` (Go): 精确统计物理代码量分布（为架构图提供物理依据）
+  - `ast-grep` (Rust): 基于 AST 查找真实的启动入口（替代易错的 grep）
+  - `yq` (Go): 提取嵌套 YAML 配置如 Docker GPU 需求
+- **How**:
+  - Step 1: 编写 `code-explore/setup` 脚本，实现全平台架构零依赖自动下载上述静态二进制至 `bin/`。
+  - Step 2: 改造 Agent 的执行流，先调用工具生成 JSON，再让 LLM 基于确定的 JSON 产出架构报告。
+- **Effort**: L
+- **Status**: 🚧 规划并设计中 (见 `docs/tool-selection-for-code-explore.md`)
+
 ---
 
 ## 项目结构（最终形态）
@@ -192,6 +210,12 @@ judge-the-code/
 - **决策**: 不与 everything-claude-code 合并，保持独立仓库
 - **理由**: 独立品牌，定位清晰
 - **缓解**: 保持接口兼容，未来可迁移
+
+### 2026-03-18: 架构升级 (四层能力与混合架构拓展)
+- **决策 1**: 将原有的三层工作流扩充为四层，新增“经济层” `token-optimize`。
+- **理由**: AI 项目的“隐患”不仅是安全（CVE/漏洞），在当前时代，无意义的 Token 燃烧（钱包黑洞）和冗余上下文导致的注意力污染（引发幻觉）同样是致命缺陷。
+- **决策 2**: 确立了整个 `judge-the-code` 向“混合架构 (Hybrid Architecture)”全面进化的方针。所有涉及到确定性提取的 Agent（如 `code-explore` 中的技术栈、代码结构、入口点寻找），均由底层的 Go/Rust 二进制工具（`enry`, `syft`, `scc`, `ast-grep`）生成结构化数据，LLM 只做最终的语义翻译与提炼。
+- **理由**: 纯 Prompt 盲猜的方式在真实工业项目（Monorepo、跨语言、路径别名）中极不可靠，且严重浪费 Token 上下文。使用顶级开源命令行工具可实现“0 幻觉 + 毫秒级”的数据采集，并解决环境依赖问题。
 
 ---
 
