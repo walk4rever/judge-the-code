@@ -6,14 +6,50 @@
 
 分析关键依赖库，解释"为什么用这个库"。
 
-⚠️ **只读依赖声明文件，最多读 80 行。不要读任何源码文件。**
+⚠️ **只读依赖声明文件，不要读任何源码文件。**
 
 ## 步骤
 
-1. 读取依赖声明文件（`package.json` 前 80 行、`requirements.txt` 前 80 行 等）
-2. 将依赖分类：核心框架 / 数据库 / 认证 / HTTP / 工具 / 测试 / 构建
-3. 对非显而易见的库解释其用途（基于库名 + 已知知识推断，**不需要去读库的源码**）
-4. 识别项目的技术选型风格（保守/前沿/重量级/轻量级）
+### 步骤 0：完整依赖提取（工具增强，可选）
+
+检查 syft 是否可用：
+
+```bash
+[ -x "{SKILL_DIR}/bin/syft" ] && echo "AVAILABLE" || echo "MISSING"
+```
+
+- **AVAILABLE** → 运行以下命令获取完整 SBOM（软件物料清单）：
+
+  ```bash
+  "{SKILL_DIR}/bin/syft" dir:"{TARGET}" -o json 2>/dev/null \
+    | python3 -c "
+  import json, sys
+  data = json.load(sys.stdin)
+  pkgs = set()
+  for p in data.get('artifacts', []):
+      pkgs.add((p.get('type','?'), p['name'], p.get('version','?')))
+  for typ, name, ver in sorted(pkgs):
+      print(f'{typ}\t{name}@{ver}')
+  " | head -100
+  ```
+
+  将此输出作为**权威依赖清单**，完全替代步骤 1 的文件读取。syft 会穿透所有子目录和 lockfile，不会截断。
+
+- **MISSING** → 跳过，执行步骤 1 的原有方式。
+
+### 步骤 1：读取依赖声明文件（syft 不可用时的 fallback）
+
+读取依赖声明文件（`package.json` 前 80 行、`requirements.txt` 前 80 行等）。
+
+### 步骤 2：依赖分类与解读
+
+将依赖分类：核心框架 / 数据库 / 认证 / HTTP / 工具 / 测试 / 构建
+
+对非显而易见的库解释其用途（基于库名 + 已知知识推断，**不需要去读库的源码**）。
+
+### 步骤 3：识别技术选型风格
+
+识别项目的技术选型风格（保守/前沿/重量级/轻量级）。
 
 ## 常见库识别参考
 

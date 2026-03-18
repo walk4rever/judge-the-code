@@ -10,7 +10,7 @@ description: >-
   "这个 repo 是干嘛的"、"帮我看懂这个"、"给我讲讲这个项目的结构"。
   DO NOT TRIGGER when: 用户只想修改或调试某个具体文件，或只问单个函数的问题。
 origin: judge-the-code
-version: 1.3.0
+version: 2.0.0
 ---
 
 # Understand Repo — GitHub 项目理解向导
@@ -182,6 +182,21 @@ find ~/.agents/skills ~/.claude/skills -name "SKILL.md" -path "*/code-explore/*"
 
 将结果记为 `{SKILL_DIR}`。
 
+**检查工具可用性：**
+
+```bash
+SCC=$([ -x "{SKILL_DIR}/bin/scc" ] && echo "✅" || echo "⚠️ 未安装")
+SYFT=$([ -x "{SKILL_DIR}/bin/syft" ] && echo "✅" || echo "⚠️ 未安装")
+echo "scc: $SCC  syft: $SYFT"
+```
+
+- 若两者均为 `⚠️ 未安装` → 提示（不阻断，继续 fallback 模式）：
+  ```
+  💡 提示：运行 {SKILL_DIR}/setup 可安装增强工具（syft + scc，约 35MB），
+     依赖分析准确率和架构图质量将显著提升。当前以 fallback 模式运行。
+  ```
+- 若至少一个可用 → 直接继续，对应 Agent 将自动使用工具。
+
 **输出进度公告：**
 
 ```
@@ -275,7 +290,18 @@ A: [基于架构给出步骤]
 
 保存文件到`.judge-the-code/code-explore.md`。
 
-**保存完成后，你必须使用 bash 执行 `{SKILL_DIR}/bin/view .` 生成并打开 dashboard。**
+**保存完成后，使用 bash 检查并执行 dashboard：**
+
+```bash
+if [ -x "{SKILL_DIR}/bin/view" ]; then
+  "{SKILL_DIR}/bin/view" .
+else
+  echo "SKIP_VIEW"
+fi
+```
+
+- 输出 `SKIP_VIEW`：跳过 dashboard，提示用户"如需可视化报告，请先运行 `/demon-hunter` 安装 view 工具"。
+- 否则：dashboard 已生成并在浏览器打开。
 
 **执行完成后，输出：**
 ```
