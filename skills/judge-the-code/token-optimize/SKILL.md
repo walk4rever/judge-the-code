@@ -49,7 +49,7 @@ version: 1.0.0
 1. 运行 bash 检查路径：
 
    ```bash
-   TARGET="{用户提供的路径}"
+   TARGET="{用户提供的路径}"  # 实际替换时必须加双引号，如 TARGET="/path/to/project"
 
    if [ -z "$TARGET" ]; then
      echo "EMPTY"
@@ -78,17 +78,18 @@ version: 1.0.0
 
 ### Phase 1：寻找 LLM 交互点 (Discovery)
 
-使用 bash `grep` 或 `rg` 查找代码库中的 LLM 触点。
+使用 **Grep 工具**（而非 bash grep/rg）查找代码库中的 LLM 触点。
 搜索特征包含但不限于：
 - 核心 SDK 调用：`openai.`, `anthropic.messages`, `gemini`, `bedrock`
 - 框架封装：`langchain`, `llamaindex`, `dify`, `ai_agent`
 - 提示词相关：`system_prompt`, `PromptTemplate`
 - 网络请求：寻找向 `api.openai.com`, `api.anthropic.com` 发送的 HTTP 请求。
 
-命令示例：
-```bash
-grep -rnE "(chat\.completions|messages\.create|langchain|llamaindex|SystemMessage|api\.openai\.com|api\.anthropic\.com)" {TARGET} | grep -v "node_modules" | head -n 30
+使用 Grep 工具，pattern 示例：
 ```
+(chat\.completions|messages\.create|langchain|llamaindex|SystemMessage|api\.openai\.com|api\.anthropic\.com)
+```
+glob 设为 `**/*`，path 设为 `{TARGET}`，排除 `node_modules`。
 
 ---
 
@@ -146,7 +147,18 @@ grep -rnE "(chat\.completions|messages\.create|langchain|llamaindex|SystemMessag
 
 保存到`.judge-the-code/token-optimize.md`。
 
-**保存完成后，你必须使用 bash 执行 `{SKILL_DIR}/bin/view .` 生成并打开 dashboard。**
+**保存完成后，使用 bash 检查并执行 dashboard：**
+
+```bash
+if [ -x "{SKILL_DIR}/bin/view" ]; then
+  "{SKILL_DIR}/bin/view" .
+else
+  echo "SKIP_VIEW"
+fi
+```
+
+- 输出 `SKIP_VIEW`：跳过 dashboard，提示用户"如需可视化报告，请先运行 `/demon-hunter` 安装 view 工具"。
+- 否则：dashboard 已生成并在浏览器打开。
 
 **执行完成后，输出：**
 ```
