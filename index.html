@@ -3,163 +3,861 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>judge-the-code | AI Code Judgment Tool</title>
-    <meta name="description" content="The missing code judgment layer in the AI era. Analyze, review, and secure AI-generated code before it goes to production.">
+    <title>judge-the-code — The Missing Code Judgment Layer for the AI Era</title>
+    <meta name="description" content="AI writes code. You judge it. judge-the-code helps developers maintain taste and judgment over AI-generated software with security scanning, design analysis, and token optimization.">
+    <meta property="og:title" content="judge-the-code — AI Code Judgment Tool">
+    <meta property="og:description" content="The missing code judgment layer in the AI era. 4 skills to analyze, review, secure, and optimize AI-generated code.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://judge.air7.fun">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-deep: #06060f;
+            --bg-card: rgba(255,255,255,0.03);
+            --bg-card-hover: rgba(255,255,255,0.06);
+            --border: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.15);
+            --text-primary: #f0f0f5;
+            --text-secondary: #8b8b9e;
+            --text-muted: #5a5a6e;
+            --accent-indigo: #6366f1;
+            --accent-purple: #a855f7;
+            --accent-cyan: #22d3ee;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
             line-height: 1.6;
-            color: #1a1a2e;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
-            min-height: 100vh;
-            color: #e4e4e7;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 60px 20px;
+
+        /* ── Noise texture overlay ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
         }
-        .hero { text-align: center; margin-bottom: 60px; }
-        .logo {
-            font-size: 48px;
-            margin-bottom: 20px;
+
+        /* ── Layout ── */
+        .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+        section { padding: 100px 0; }
+
+        /* ── Nav ── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(6,6,15,0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        nav .container {
+            display: flex; align-items: center; justify-content: space-between;
+            height: 64px;
+        }
+        .nav-brand {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700; font-size: 18px;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .nav-brand span { font-size: 22px; }
+        .nav-links { display: flex; align-items: center; gap: 32px; }
+        .nav-links a {
+            color: var(--text-secondary); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--text-primary); }
+        .nav-cta {
+            background: var(--accent-indigo) !important;
+            color: white !important;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-weight: 600 !important;
+            transition: background 0.2s, transform 0.2s !important;
+        }
+        .nav-cta:hover { background: #5558e6 !important; transform: translateY(-1px); }
+
+        /* ── Hero ── */
+        .hero {
+            padding: 160px 0 120px;
+            text-align: center;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 50%; transform: translateX(-50%);
+            width: 800px; height: 600px;
+            background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, rgba(168,85,247,0.06) 40%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(99,102,241,0.1);
+            border: 1px solid rgba(99,102,241,0.25);
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 13px; font-weight: 500;
+            color: #a5b4fc;
+            margin-bottom: 32px;
+        }
+        .hero-badge .dot {
+            width: 6px; height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
         h1 {
-            font-size: 42px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            background: linear-gradient(90deg, #6366f1, #a855f7);
+            font-size: clamp(42px, 6vw, 72px);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            margin-bottom: 24px;
+        }
+        h1 .gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #22d3ee 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        .tagline {
-            font-size: 20px;
-            color: #a1a1aa;
-            margin-bottom: 30px;
+        .hero-sub {
+            font-size: clamp(18px, 2.2vw, 22px);
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto 48px;
+            line-height: 1.7;
         }
-        .description {
-            font-size: 18px;
-            color: #d4d4d8;
-            max-width: 600px;
-            margin: 0 auto 40px;
+        .hero-actions {
+            display: flex; gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 16px; font-weight: 600;
+            text-decoration: none;
+            transition: all 0.25s;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+            color: white;
+            box-shadow: 0 4px 24px rgba(99,102,241,0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 40px rgba(99,102,241,0.45);
+        }
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+
+        /* ── Problem Statement ── */
+        .problem { background: rgba(255,255,255,0.01); }
+        .problem-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+        .problem-text h2 {
+            font-size: 36px; font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        .problem-text p {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
             line-height: 1.8;
         }
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 24px;
-            margin: 40px 0;
+        .problem-visual {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
         }
-        .feature {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
+        .problem-visual .line {
+            display: flex; gap: 12px;
+        }
+        .problem-visual .icon { flex-shrink: 0; }
+        .problem-visual .label { color: var(--text-secondary); }
+        .problem-visual .danger { color: var(--accent-red); }
+        .problem-visual .warn { color: var(--accent-amber); }
+
+        /* ── Workflow ── */
+        .workflow-header { text-align: center; margin-bottom: 64px; }
+        .workflow-header h2 {
+            font-size: 36px; font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+        }
+        .workflow-header p {
+            color: var(--text-secondary);
+            font-size: 17px;
+            max-width: 560px;
+            margin: 0 auto;
+        }
+        .workflow-pipeline {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .workflow-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px 24px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .workflow-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            border-radius: 16px 16px 0 0;
+        }
+        .workflow-card:nth-child(1)::before { background: var(--accent-indigo); }
+        .workflow-card:nth-child(2)::before { background: var(--accent-purple); }
+        .workflow-card:nth-child(3)::before { background: var(--accent-red); }
+        .workflow-card:nth-child(4)::before { background: var(--accent-amber); }
+        .workflow-card:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+        }
+        .workflow-card .card-icon {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+        .workflow-card h3 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px; font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .workflow-card .card-layer {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+        }
+        .workflow-card:nth-child(1) .card-layer { color: var(--accent-indigo); }
+        .workflow-card:nth-child(2) .card-layer { color: var(--accent-purple); }
+        .workflow-card:nth-child(3) .card-layer { color: var(--accent-red); }
+        .workflow-card:nth-child(4) .card-layer { color: var(--accent-amber); }
+        .workflow-card p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .workflow-card .card-status {
+            margin-top: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .status-ready { color: var(--accent-green); }
+        .status-planned { color: var(--text-muted); }
+
+        /* ── Arrows between cards (desktop) ── */
+        .workflow-arrow {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        /* ── Architecture ── */
+        .arch { background: rgba(255,255,255,0.01); }
+        .arch-header { text-align: center; margin-bottom: 64px; }
+        .arch-header h2 { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+        .arch-header p { color: var(--text-secondary); font-size: 17px; max-width: 600px; margin: 0 auto; }
+        .arch-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 48px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }
+        .arch-row {
+            display: flex;
+            gap: 48px;
+            margin-bottom: 32px;
+        }
+        .arch-col { flex: 1; }
+        .arch-col h4 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .arch-col:first-child h4 { color: var(--accent-purple); }
+        .arch-col:last-child h4 { color: var(--accent-cyan); }
+        .arch-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 0;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        .arch-item .name { color: var(--text-primary); font-weight: 500; }
+        .arch-arrow { color: var(--text-muted); }
+
+        /* ── Coming next ── */
+        .coming-next {
+            text-align: center;
+        }
+        .coming-next-header { margin-bottom: 48px; }
+        .coming-next-header h2 { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+        .coming-next-header p { color: var(--text-secondary); font-size: 17px; max-width: 600px; margin: 0 auto; }
+        .coming-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            text-align: left;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .coming-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 12px;
             padding: 24px;
         }
-        .feature h3 {
-            color: #a855f7;
-            margin-bottom: 12px;
-            font-size: 18px;
+        .coming-item h4 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 8px;
         }
-        .feature p { color: #a1a1aa; font-size: 14px; }
-        .cta {
-            display: inline-block;
-            background: linear-gradient(90deg, #6366f1, #a855f7);
-            color: white;
-            padding: 16px 32px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 16px;
-            margin: 10px;
-            transition: transform 0.2s, box-shadow 0.2s;
+        .coming-item p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.7;
         }
-        .cta:hover {
+
+        /* ── Use Cases ── */
+        .usecases-header { text-align: center; margin-bottom: 64px; }
+        .usecases-header h2 { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+        .usecases-header p { color: var(--text-secondary); font-size: 17px; }
+        .usecases-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .usecase {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            transition: all 0.3s;
+        }
+        .usecase:hover {
+            border-color: var(--border-hover);
             transform: translateY(-2px);
-            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
         }
-        .cta.secondary {
-            background: transparent;
-            border: 2px solid #6366f1;
+        .usecase-icon { font-size: 28px; margin-bottom: 16px; }
+        .usecase h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+        .usecase p { color: var(--text-secondary); font-size: 14px; line-height: 1.7; }
+
+        /* ── Stats ── */
+        .stats {
+            background: linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(168,85,247,0.04) 100%);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            padding: 80px 0;
         }
-        .skills {
-            background: rgba(255,255,255,0.03);
-            border-radius: 12px;
-            padding: 30px;
-            margin: 40px 0;
-        }
-        .skills h2 { margin-bottom: 20px; font-size: 24px; }
-        .skill-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .skill-tag {
-            background: rgba(99, 102, 241, 0.2);
-            color: #a5b4fc;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-        .footer {
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 40px;
             text-align: center;
-            margin-top: 60px;
-            color: #71717a;
-            font-size: 14px;
         }
-        .github-link {
-            color: #a855f7;
+        .stat-number {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .stat-number.indigo { color: var(--accent-indigo); }
+        .stat-number.purple { color: var(--accent-purple); }
+        .stat-number.cyan { color: var(--accent-cyan); }
+        .stat-number.amber { color: var(--accent-amber); }
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* ── Install ── */
+        .install { text-align: center; }
+        .install h2 {
+            font-size: 36px; font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+        }
+        .install > p {
+            color: var(--text-secondary);
+            font-size: 17px;
+            margin-bottom: 40px;
+        }
+        .install-steps {
+            max-width: 600px;
+            margin: 0 auto 48px;
+            text-align: left;
+        }
+        .install-step {
+            display: flex; gap: 20px;
+            margin-bottom: 24px;
+        }
+        .step-num {
+            flex-shrink: 0;
+            width: 32px; height: 32px;
+            background: rgba(99,102,241,0.15);
+            color: var(--accent-indigo);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px;
+        }
+        .step-content h4 {
+            font-size: 15px; font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .step-content code {
+            display: block;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--accent-cyan);
+            margin-top: 8px;
+            overflow-x: auto;
+        }
+
+        /* ── Terminal Demo ── */
+        .terminal {
+            max-width: 680px;
+            margin: 0 auto 48px;
+            background: #0d0d1a;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .terminal-bar {
+            display: flex; gap: 8px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+        }
+        .terminal-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+        }
+        .terminal-dot.red { background: #ef4444; }
+        .terminal-dot.yellow { background: #f59e0b; }
+        .terminal-dot.green { background: #10b981; }
+        .terminal-body {
+            padding: 20px 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 2;
+        }
+        .terminal-body .prompt { color: var(--accent-green); }
+        .terminal-body .cmd { color: var(--text-primary); }
+        .terminal-body .comment { color: var(--text-muted); }
+        .terminal-body .output { color: var(--text-secondary); }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 48px 0;
+        }
+        .footer-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-brand {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+        .footer-links {
+            display: flex; gap: 24px;
+        }
+        .footer-links a {
+            color: var(--text-muted);
             text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: var(--text-secondary); }
+        .footer-mit {
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .workflow-pipeline { grid-template-columns: repeat(2, 1fr); }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; }
+            .coming-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+            .problem-grid { grid-template-columns: 1fr; gap: 40px; }
+            .usecases-grid { grid-template-columns: 1fr; }
+            .workflow-pipeline { grid-template-columns: 1fr; }
+            .nav-links a:not(.nav-cta) { display: none; }
+            .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
+            .arch-row { flex-direction: column; gap: 24px; }
+            .arch-diagram { padding: 24px; }
+            section { padding: 64px 0; }
+            .hero { padding: 120px 0 80px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
 <body>
+
+<!-- ── Nav ── -->
+<nav>
     <div class="container">
-        <div class="hero">
-            <div class="logo">⚖️</div>
-            <h1>judge-the-code</h1>
-            <p class="tagline">The missing code judgment layer in the AI era</p>
-            <p class="description">
-                AI generates code. But running code isn't the same as good code. 
-                This tool helps you analyze, review, and secure AI-generated code 
-                before it goes to production.
-            </p>
-            <div>
-                <a href="https://github.com/walk4rever/judge-the-code" class="cta">View on GitHub →</a>
-                <a href="#features" class="cta secondary">Learn More</a>
-            </div>
-        </div>
-
-        <div class="skills">
-            <h2>🔧 Skills Included</h2>
-            <div class="skill-list">
-                <span class="skill-tag">code-explore</span>
-                <span class="skill-tag">design-lens</span>
-                <span class="skill-tag">demon-hunter</span>
-            </div>
-        </div>
-
-        <div class="features" id="features">
-            <div class="feature">
-                <h3>🔍 code-explore</h3>
-                <p>Build global understanding of a codebase — structure, stack, entry points, dependencies.</p>
-            </div>
-            <div class="feature">
-                <h3>🎨 design-lens</h3>
-                <p>Extract design philosophy and key decisions — find what's brilliant, reasonable, or questionable.</p>
-            </div>
-            <div class="feature">
-                <h3>👹 demon-hunter</h3>
-                <p>Find security vulnerabilities, dependency CVEs, leaked secrets, performance traps, design hazards.</p>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>Built by <a href="https://github.com/walk4rever" class="github-link">@walk4rever</a></p>
-            <p>Open Source • Free to Use</p>
+        <a href="#" class="nav-brand"><span>⚖️</span> judge-the-code</a>
+        <div class="nav-links">
+            <a href="#workflow">Skills</a>
+            <a href="#usecases">Use Cases</a>
+            <a href="#install">Install</a>
+            <a href="https://github.com/walk4rever/judge-the-code" class="nav-cta">GitHub →</a>
         </div>
     </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+    <div class="container">
+        <div class="hero-badge">
+            <span class="dot"></span>
+            4 skills shipped · MIT License · Open Source
+        </div>
+        <h1>
+            AI writes code.<br>
+            <span class="gradient">You judge it.</span>
+        </h1>
+        <p class="hero-sub">
+            The missing code judgment layer for the AI era.<br>
+            Understand structure. Extract design taste. Hunt security demons. Stop token waste.
+        </p>
+        <div class="hero-actions">
+            <a href="https://github.com/walk4rever/judge-the-code" class="btn btn-primary">
+                Get Started →
+            </a>
+            <a href="#workflow" class="btn btn-secondary">
+                See How It Works
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- ── Problem ── -->
+<section class="problem">
+    <div class="container">
+        <div class="problem-grid">
+            <div class="problem-text">
+                <h2>AI makes code run.<br>Running ≠ Good.</h2>
+                <p>
+                    Before AI, writing code and understanding code were the same act.
+                    Now AI writes the code. Writing and understanding have decoupled.
+                </p>
+                <p>
+                    AI-generated code can introduce security holes, break your design philosophy,
+                    plant performance bombs, and silently burn your LLM budget.
+                    Catching these requires understanding the codebase's DNA.
+                </p>
+                <p>
+                    That understanding can't come from lint. It can't come from tests.
+                    <strong style="color: var(--text-primary);">It can only come from human judgment.</strong>
+                </p>
+            </div>
+            <div class="problem-visual">
+                <div class="line"><span class="icon">🔓</span> <span class="danger">SQL injection</span> <span class="label">— hidden in AI helper function</span></div>
+                <div class="line"><span class="icon">💣</span> <span class="danger">N+1 query</span> <span class="label">— explodes at 100k users</span></div>
+                <div class="line"><span class="icon">🔑</span> <span class="danger">API key in source</span> <span class="label">— committed to git history</span></div>
+                <div class="line"><span class="icon">🧱</span> <span class="warn">Design philosophy broken</span> <span class="label">— AI ignored your patterns</span></div>
+                <div class="line"><span class="icon">🔥</span> <span class="warn">Token black hole</span> <span class="label">— 10x cost, nobody noticed</span></div>
+                <div class="line"><span class="icon">⚠️</span> <span class="warn">CVE in dependency</span> <span class="label">— 2 years old, still shipped</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Workflow: 4 Skills ── -->
+<section id="workflow">
+    <div class="container">
+        <div class="workflow-header">
+            <h2>Four layers of judgment</h2>
+            <p>Each skill builds on the last. Together they form a complete code judgment pipeline.</p>
+        </div>
+        <div class="workflow-pipeline">
+            <div class="workflow-card">
+                <div class="card-icon">🔍</div>
+                <div class="card-layer">Structure layer</div>
+                <h3>code-explore</h3>
+                <p>Build global understanding of a codebase — architecture, tech stack, entry points, dependency graph. Powered by <strong>scc</strong> + <strong>syft</strong> for deterministic analysis.</p>
+                <div class="card-status status-ready">✓ Ready</div>
+            </div>
+            <div class="workflow-card">
+                <div class="card-icon">🎨</div>
+                <div class="card-layer">Taste layer</div>
+                <h3>design-lens</h3>
+                <p>Extract design philosophy and key decisions. Find what's brilliant, what's a reasonable trade-off, and what deserves questioning. Rate decisions as 🔮 Elegant / ✅ Sound / ⚠️ Suspect / ❌ Anti-pattern.</p>
+                <div class="card-status status-ready">✓ Ready</div>
+            </div>
+            <div class="workflow-card">
+                <div class="card-icon">👹</div>
+                <div class="card-layer">Judgment layer</div>
+                <h3>demon-hunter</h3>
+                <p>Find real security vulnerabilities, CVEs, leaked secrets, performance traps. Hybrid architecture: <strong>bearer + trivy + gitleaks</strong> (deterministic) + Claude (semantic interpretation).</p>
+                <div class="card-status status-ready">✓ Ready</div>
+            </div>
+            <div class="workflow-card">
+                <div class="card-icon">💰</div>
+                <div class="card-layer">Economy layer</div>
+                <h3>token-optimize</h3>
+                <p>Discover token waste in LLM integrations — wallet black holes, attention pollution from bloated context, unnecessary input that degrades output quality.</p>
+                <div class="card-status status-ready">✓ Ready</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Architecture ── -->
+<section class="arch">
+    <div class="container">
+        <div class="arch-header">
+            <h2>Hybrid architecture</h2>
+            <p>Tools find problems deterministically. Claude explains why they matter with project context.</p>
+        </div>
+        <div class="arch-diagram">
+            <div class="arch-row">
+                <div class="arch-col">
+                    <h4>Skill Layer (Claude)</h4>
+                    <div class="arch-item"><span class="name">code-explore</span> <span class="arch-arrow">← scc, syft</span></div>
+                    <div class="arch-item"><span class="name">design-lens</span> <span class="arch-arrow">← source sampling</span></div>
+                    <div class="arch-item"><span class="name">demon-hunter</span> <span class="arch-arrow">← bearer, trivy, gitleaks</span></div>
+                    <div class="arch-item"><span class="name">token-optimize</span> <span class="arch-arrow">← static call-site analysis</span></div>
+                </div>
+                <div class="arch-col">
+                    <h4>Tool Layer (Deterministic)</h4>
+                    <div class="arch-item"><span class="name">scc</span> — code metrics & line counts</div>
+                    <div class="arch-item"><span class="name">syft</span> — SBOM & dependency graph</div>
+                    <div class="arch-item"><span class="name">bearer</span> — SAST data flow analysis</div>
+                    <div class="arch-item"><span class="name">trivy</span> — CVE vulnerability database</div>
+                    <div class="arch-item"><span class="name">gitleaks</span> — secret detection in git</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Stats ── -->
+<section class="stats">
+    <div class="container">
+        <div class="stats-grid">
+            <div>
+                <div class="stat-number indigo">4</div>
+                <div class="stat-label">Skills shipped</div>
+            </div>
+            <div>
+                <div class="stat-number purple">5</div>
+                <div class="stat-label">Deterministic tools</div>
+            </div>
+            <div>
+                <div class="stat-number cyan">2 min</div>
+                <div class="stat-label">Setup time</div>
+            </div>
+            <div>
+                <div class="stat-number amber">MIT</div>
+                <div class="stat-label">Open Source License</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Use Cases ── -->
+<section id="usecases">
+    <div class="container">
+        <div class="usecases-header">
+            <h2>Built for real workflows</h2>
+            <p>From library evaluation to AI code review, judgment is the gap tools don't fill.</p>
+        </div>
+        <div class="usecases-grid">
+            <div class="usecase">
+                <div class="usecase-icon">📦</div>
+                <h3>Evaluating a new library</h3>
+                <p>Not just what it does, but what traps it hides. Know the design decisions, hidden CVEs, and dependency risks before you adopt.</p>
+            </div>
+            <div class="usecase">
+                <div class="usecase-icon">🤖</div>
+                <h3>Reviewing AI-generated code</h3>
+                <p>Verify the AI didn't break your design philosophy, introduce security holes, or bury performance landmines that explode in production.</p>
+            </div>
+            <div class="usecase">
+                <div class="usecase-icon">🏗️</div>
+                <h3>Onboarding to a codebase</h3>
+                <p>Build real structural understanding in minutes — architecture, entry points, design intent, known hazards — not just a surface-level tour.</p>
+            </div>
+            <div class="usecase">
+                <div class="usecase-icon">💸</div>
+                <h3>Auditing LLM costs</h3>
+                <p>Find where tokens are wasted, contexts bloated, and money burned. Get actionable recommendations for model routing and context optimization.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Coming Next: skill-review ── -->
+<section class="coming-next">
+    <div class="container">
+        <div class="coming-next-header">
+            <h2>Coming next: <span style="font-family: 'JetBrains Mono', monospace; color: var(--accent-purple);">skill-review</span></h2>
+            <p>A new frontier — quality review for Skill/Prompt engineering projects, where traditional code tools are useless.</p>
+        </div>
+        <div class="coming-grid">
+            <div class="coming-item">
+                <h4>🎯 Prompt Clarity</h4>
+                <p>Are instructions ambiguous? Would a weaker model misinterpret them?</p>
+            </div>
+            <div class="coming-item">
+                <h4>🔀 Agent Orchestration</h4>
+                <p>Are parallel agents truly independent? Hidden serial dependencies?</p>
+            </div>
+            <div class="coming-item">
+                <h4>🛡️ Security Boundaries</h4>
+                <p>Prompt injection risks? Overly broad file system access?</p>
+            </div>
+            <div class="coming-item">
+                <h4>🔄 Fault Tolerance</h4>
+                <p>What happens when an agent fails? Is there a fallback path?</p>
+            </div>
+            <div class="coming-item">
+                <h4>📐 Execution Flow</h4>
+                <p>Are phases well-structured? Any dead ends or information gaps?</p>
+            </div>
+            <div class="coming-item">
+                <h4>🔌 Model Portability</h4>
+                <p>Does it over-rely on one model's quirks?</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Install ── -->
+<section id="install">
+    <div class="container install">
+        <h2>Up and running in 2 minutes</h2>
+        <p>One copy. One setup. Start judging.</p>
+
+        <div class="install-steps">
+            <div class="install-step">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                    <h4>Copy the skill</h4>
+                    <code>cp -r skills/judge-the-code ~/.agents/skills/</code>
+                </div>
+            </div>
+            <div class="install-step">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                    <h4>Run setup (downloads scan tools)</h4>
+                    <code>~/.agents/skills/judge-the-code/setup</code>
+                </div>
+            </div>
+        </div>
+
+        <div class="terminal">
+            <div class="terminal-bar">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+            </div>
+            <div class="terminal-body">
+                <div><span class="prompt">$</span> <span class="cmd">/code-explore .</span>      <span class="comment"># understand the structure</span></div>
+                <div><span class="prompt">$</span> <span class="cmd">/design-lens .</span>       <span class="comment"># extract design philosophy</span></div>
+                <div><span class="prompt">$</span> <span class="cmd">/demon-hunter .</span>      <span class="comment"># hunt for demons</span></div>
+                <div><span class="prompt">$</span> <span class="cmd">/token-optimize .</span>    <span class="comment"># find token waste</span></div>
+                <div style="margin-top: 8px;"><span class="output">✓ 4 reports generated → .judge-the-code/</span></div>
+                <div><span class="prompt">$</span> <span class="cmd">view .</span>               <span class="comment"># open visual dashboard</span></div>
+            </div>
+        </div>
+
+        <a href="https://github.com/walk4rever/judge-the-code" class="btn btn-primary" style="margin-top: 8px;">
+            View on GitHub →
+        </a>
+    </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+    <div class="container">
+        <div class="footer-inner">
+            <div class="footer-brand">⚖️ judge-the-code</div>
+            <div class="footer-links">
+                <a href="https://github.com/walk4rever/judge-the-code">GitHub</a>
+                <a href="https://github.com/walk4rever/judge-the-code/issues">Issues</a>
+                <a href="https://github.com/walk4rever">@walk4rever</a>
+            </div>
+            <div class="footer-mit">
+                MIT License · Free to use, modify, and distribute
+            </div>
+        </div>
+    </div>
+</footer>
+
 </body>
 </html>
