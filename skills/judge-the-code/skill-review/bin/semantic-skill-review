@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# semantic-skill-review
+# Heuristic semantic pass for Skill/Prompt projects.
+#
+# Usage:
+#   semantic-skill-review <target-dir> [output-json]
+
+TARGET="${1:-.}"
+OUT="${2:-$TARGET/.judge-the-code/skill-review-semantic.json}"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$OUT")"
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: python3 is required" >&2
+  exit 1
+fi
+
+python3 - "$TARGET" "$OUT" <<'PY'
+import json
+import os
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+target = Path(sys.argv[1]).resolve()
+out = Path(sys.argv[2])
+
+files = []
+for p in target.rglob("*"):
+    if p.is_file() and (p.name == "SKILL.md" or "agents" in p.parts and p.suffix == ".md"):
+        files.append(p)
+files.sort()
+
+findings = []
+
+def add(rule, severity, file, line, message, suggestion, dimension):
+    findings.append({
+        "rule": rule,
+        "severity": severity,
+        "file": str(file),
+        "line": int(line) if isinstance(line, int) or str(line).isdigit() else 1,
+        "message": message,
+        "suggestion": suggestion,
+        "dimension": dimension,
+        "source": "semantic",
+    })
+
+def first_line_matching(lines, pattern):
+    rx = re.compile(pattern, re.IGNORECASE)
+    for i, line in enumerate(lines, start=1):
+        if rx.search(line):
+            return i
+    return 1
+
+for p in files:
+    text = p.read_text(encoding="utf-8", errors="ignore")
+    lines = text.splitlines()
+    lower = text.lower()
+
+    # Prompt clarity: vague wording without measurable criteria.
+    vague = re.findall(r"(尽量|适当|合理地|尽可能|酌情|best effort|appropriately|as needed|if possible)", text, flags=re.IGNORECASE)
+    if len(vague) >= 3 and not re.search(r"(输出格式|验收|质量标准|must|必须|不得)", text, flags=re.IGNORECASE):
+        add(
+            "ambiguous_instruction_density",
+            "medium",
+            p,
+            first_line_matching(lines, r"尽量|适当|合理地|best effort|as needed"),
+            "High density of vague instructions without strict acceptance criteria.",
+            "Add explicit pass/fail criteria or output schema near each vague instruction.",
+            "Prompt 清晰度",
+        )
+
+    # Execution flow: phase numbers missing continuity
+    phases = re.findall(r"Phase\s*([0-9]+)", text, flags=re.IGNORECASE)
+    if len(phases) >= 2:
+        nums = sorted({int(x) for x in phases})
+        expect = list(range(nums[0], nums[-1] + 1))
+        if nums != expect:
+            add(
+                "phase_gap_detected",
+                "medium",
+                p,
+                first_line_matching(lines, r"phase"),
+                "Phase numbering has gaps, which may cause execution ambiguity.",
+                "Use contiguous Phase numbering and ensure each phase has input/output.",
+                "执行流设计",
+            )
+
+    # Orchestration: says parallel but includes cross-agent dependency hints.
+    if re.search(r"(并行|parallel)", text, flags=re.IGNORECASE) and re.search(r"(依赖.*agent|读取.*agent|consume.*agent|depends on agent)", lower, flags=re.IGNORECASE):
+        add(
+            "parallel_dependency_ambiguity",
+            "high",
+            p,
+            first_line_matching(lines, r"并行|parallel"),
+            "Parallel orchestration appears to include cross-agent dependencies.",
+            "Split into explicit serial phase or remove inter-agent dependency in parallel stage.",
+            "Agent 编排",
+        )
+
+    # Fault tolerance: mentions tools/agents but no failure branch.
+    if re.search(r"(tool|工具|agent)", text, flags=re.IGNORECASE) and not re.search(r"(fallback|降级|失败|error|MISSING|SKIP_)", text, flags=re.IGNORECASE):
+        add(
+            "missing_failure_branch",
+            "medium",
+            p,
+            1,
+            "Mentions tools/agents but no explicit failure/degradation branch found.",
+            "Add fallback branch for tool missing, timeout, and partial failure.",
+            "容错与降级",
+        )
+
+    # Model compatibility: hard-coupled model vendor keywords.
+    vendor_hits = re.findall(r"(claude code|anthropic|openai|gpt-)", lower)
+    if len(vendor_hits) >= 3 and not re.search(r"(兼容|compatib|可移植|fallback model|model portability)", lower):
+        add(
+            "vendor_lockin_risk",
+            "low",
+            p,
+            first_line_matching(lines, r"claude|anthropic|openai|gpt"),
+            "Instructions appear tightly coupled to specific model/vendor conventions.",
+            "Add model-agnostic wording and a compatibility note for non-primary models.",
+            "模型兼容性",
+        )
+
+# Dimension scoring from semantic findings.
+dimensions = [
+    "Prompt 清晰度",
+    "执行流设计",
+    "输入验证",
+    "Agent 编排",
+    "容错与降级",
+    "Token 效率",
+    "安全边界",
+    "模型兼容性",
+]
+scores = {d: 8 for d in dimensions}
+penalty = {"high": 3, "medium": 2, "low": 1, "critical": 4}
+for f in findings:
+    d = f.get("dimension")
+    s = f.get("severity", "low")
+    if d in scores:
+        scores[d] = max(0, scores[d] - penalty.get(s, 1))
+
+out_obj = {
+    "target": str(target),
+    "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "dimensions": [{"name": d, "score": scores[d]} for d in dimensions],
+    "findings": findings,
+}
+
+out.write_text(json.dumps(out_obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+print(f"WROTE={out}")
+PY

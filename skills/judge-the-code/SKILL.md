@@ -4,7 +4,7 @@ description: >-
   帮助人类在 AI 大量生成代码的时代，保持对代码的 Judgment 和 Taste。
   包含四个渐进式 skill：code-explore（建立结构认知）、
   design-lens（提炼设计哲学）、demon-hunter（发现安全漏洞与设计陷阱）、
-  token-optimize（发现 Token 浪费与隐患）。
+  token-optimize（发现 Token 浪费与隐患），以及 skill-review（审查 Skill/Prompt 工程质量）。
   TRIGGER when: 用户想理解、评估、学习一个代码库，或想 review AI 生成的代码。
 origin: judge-the-code
 ---
@@ -58,6 +58,15 @@ bearer（SAST）+ trivy（依赖 CVE + Secrets + IaC）+ gitleaks（Git history 
 ```
 
 纯静态分析代码中的大模型交互点，推演 Token 消耗爆炸隐患、长上下文导致的注意力污染，并给出具体的降本、提速、防幻觉建议。
+
+## Skill/Prompt 路径（MVP）
+
+```
+/skill-review .
+```
+
+用于审查 Skill/Prompt 工程项目：Prompt 清晰度、执行流设计、Agent 编排、容错降级、安全边界与模型兼容性。
+输出 `.judge-the-code/skill-review.md`。
 
 ---
 

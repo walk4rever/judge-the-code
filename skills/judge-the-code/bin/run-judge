@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# run-judge
+# Unified entrypoint for mixed repositories.
+# Outputs are centralized in TARGET/.judge-the-code (including skill results).
+#
+# Usage:
+#   run-judge [target-dir]
+
+TARGET="${1:-.}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SUITE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SKILL_REVIEW_DIR="$SUITE_DIR/skill-review"
+DETECT="$SCRIPT_DIR/detect-project-type"
+RUN_CODE="$SCRIPT_DIR/run-code-pipeline"
+LINT="$SKILL_REVIEW_DIR/bin/lint-skill-review"
+SEM="$SKILL_REVIEW_DIR/bin/semantic-skill-review"
+GEN="$SKILL_REVIEW_DIR/bin/generate-skill-review-report"
+HISTORY="$SKILL_REVIEW_DIR/bin/update-skill-review-history"
+VIEW_SRC_DIR="$SUITE_DIR/view"
+VIEW_BIN="$SUITE_DIR/bin/view"
+
+OUT_DIR="$TARGET/.judge-the-code"
+PROFILE="$OUT_DIR/project-profile.json"
+SUMMARY="$OUT_DIR/judge-summary.md"
+SKILL_STATE_DIR="$OUT_DIR/skills"
+AGG_FINDINGS="$OUT_DIR/skill-review-findings.json"
+AGG_SEMANTIC="$OUT_DIR/skill-review-semantic.json"
+AGG_REPORT="$OUT_DIR/skill-review.md"
+AGG_BREAKDOWN="$OUT_DIR/skill-review-breakdown.md"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+for cmd in "$DETECT" "$RUN_CODE" "$LINT" "$SEM" "$GEN" "$HISTORY"; do
+  if [ ! -x "$cmd" ]; then
+    echo "error: missing executable: $cmd" >&2
+    exit 1
+  fi
+done
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: python3 is required" >&2
+  exit 1
+fi
+
+mkdir -p "$OUT_DIR" "$SKILL_STATE_DIR"
+
+ensure_view_binary() {
+  local need_build=0
+  if [ ! -x "$VIEW_BIN" ]; then
+    need_build=1
+  elif [ "$VIEW_SRC_DIR/main.go" -nt "$VIEW_BIN" ] || \
+       [ "$VIEW_SRC_DIR/template.html" -nt "$VIEW_BIN" ] || \
+       [ "$VIEW_SRC_DIR/go.mod" -nt "$VIEW_BIN" ]; then
+    need_build=1
+  fi
+  if [ "$need_build" -eq 0 ]; then
+    return 0
+  fi
+  if ! command -v go >/dev/null 2>&1; then
+    echo "⚠️  go not found: skip rebuilding view binary (dashboard may be stale)"
+    return 0
+  fi
+  echo "🔧 judge: rebuilding view binary"
+  (cd "$VIEW_SRC_DIR" && go build -o "$VIEW_BIN" .)
+}
+
+slugify() {
+  python3 - "$1" "$2" <<'PY'
+import os, re, sys
+root = os.path.abspath(sys.argv[1])
+target = os.path.abspath(sys.argv[2])
+try:
+    rel = os.path.relpath(root, target)
+except Exception:
+    rel = root
+slug = re.sub(r'[^a-zA-Z0-9._-]+', '__', rel)
+print(slug if slug else "root")
+PY
+}
+
+echo "🧭 judge: detecting project type"
+"$DETECT" "$TARGET" "$PROFILE"
+
+PROJECT_TYPE="$(python3 - "$PROFILE" <<'PY'
+import json,sys
+obj=json.load(open(sys.argv[1],encoding='utf-8'))
+print(obj.get('project_type','unknown'))
+PY
+)"
+
+SKILL_ROOTS="$(python3 - "$PROFILE" <<'PY'
+import json,sys
+obj=json.load(open(sys.argv[1],encoding='utf-8'))
+for p in obj.get('skill_roots',[]):
+    print(p)
+PY
+)"
+
+RUN_TS="$(date '+%Y-%m-%d %H:%M')"
+{
+  echo "# judge-the-code — Unified Summary"
+  echo ""
+  echo "> Generated: $RUN_TS"
+  echo "> Target: $TARGET"
+  echo "> Project type: $PROJECT_TYPE"
+  echo ""
+} > "$SUMMARY"
+
+MANIFEST="$OUT_DIR/skill-review-manifest.tsv"
+: > "$MANIFEST"
+
+if [ "$PROJECT_TYPE" = "skill_only" ] || [ "$PROJECT_TYPE" = "hybrid" ]; then
+  echo "🧠 judge: running skill-review (centralized output)"
+  if [ -z "$SKILL_ROOTS" ]; then
+    SKILL_ROOTS="$TARGET"
+  fi
+  while IFS= read -r root; do
+    [ -z "$root" ] && continue
+    slug="$(slugify "$root" "$TARGET")"
+    skill_out="$SKILL_STATE_DIR/$slug"
+    mkdir -p "$skill_out"
+    f="$skill_out/skill-review-findings.json"
+    s="$skill_out/skill-review-semantic.json"
+    r="$skill_out/skill-review.md"
+
+    "$LINT" "$root" "$f"
+    "$SEM" "$root" "$s"
+    "$GEN" "$root" "$f" "$r" "$s"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$root" "$slug" "$r" "$f" "$s" >> "$MANIFEST"
+    echo "- skill-review analyzed: $root" >> "$SUMMARY"
+  done <<< "$SKILL_ROOTS"
+
+  python3 - "$MANIFEST" "$AGG_FINDINGS" "$AGG_SEMANTIC" "$AGG_BREAKDOWN" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+manifest = Path(sys.argv[1])
+agg_find = Path(sys.argv[2])
+agg_sem = Path(sys.argv[3])
+breakdown = Path(sys.argv[4])
+
+rows = []
+for line in manifest.read_text(encoding="utf-8", errors="ignore").splitlines():
+    if not line.strip():
+        continue
+    root, slug, report, findings, semantic = line.split("\t")
+    rows.append({
+        "root": root,
+        "slug": slug,
+        "report": Path(report),
+        "findings": Path(findings),
+        "semantic": Path(semantic),
+    })
+
+all_findings = []
+all_sem_findings = []
+sem_dim_samples = {}
+md_lines = []
+md_lines.append("| Skill Root | Score | Grade | Critical | High | Medium | Low |")
+md_lines.append("|------------|-------|-------|----------|------|--------|-----|")
+
+for row in rows:
+    score = "NA"
+    grade = "NA"
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+
+    if row["report"].exists():
+        text = row["report"].read_text(encoding="utf-8", errors="ignore")
+        m1 = re.search(r"综合评分\s*[:：]\s*(\d+)", text)
+        m2 = re.search(r"等级\s*[:：]\s*([A-D][+-]?)", text)
+        if m1: score = m1.group(1)
+        if m2: grade = m2.group(1)
+
+    if row["findings"].exists():
+        obj = json.loads(row["findings"].read_text(encoding="utf-8", errors="ignore"))
+        for f in obj.get("findings", []):
+            ff = dict(f)
+            ff["skill_root"] = row["root"]
+            all_findings.append(ff)
+            sev = str(ff.get("severity", "")).lower()
+            if sev in counts:
+                counts[sev] += 1
+
+    if row["semantic"].exists():
+        obj = json.loads(row["semantic"].read_text(encoding="utf-8", errors="ignore"))
+        for f in obj.get("findings", []):
+            ff = dict(f)
+            ff["skill_root"] = row["root"]
+            all_sem_findings.append(ff)
+        for d in obj.get("dimensions", []):
+            n = d.get("name")
+            s = d.get("score")
+            if n is None or not isinstance(s, int):
+                continue
+            sem_dim_samples.setdefault(n, []).append(s)
+
+    md_lines.append(
+        f"| `{row['root']}` | {score} | {grade} | {counts['critical']} | {counts['high']} | {counts['medium']} | {counts['low']} |"
+    )
+
+agg_find.parent.mkdir(parents=True, exist_ok=True)
+agg_find.write_text(
+    json.dumps({"findings": all_findings}, ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+
+dims = []
+for name, vals in sem_dim_samples.items():
+    if vals:
+        dims.append({"name": name, "score": round(sum(vals) / len(vals))})
+dims.sort(key=lambda x: x["name"])
+agg_sem.write_text(
+    json.dumps({"dimensions": dims, "findings": all_sem_findings}, ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+
+breakdown.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+print(f"WROTE={agg_find}")
+print(f"WROTE={agg_sem}")
+print(f"WROTE={breakdown}")
+PY
+
+  "$GEN" "$TARGET" "$AGG_FINDINGS" "$AGG_REPORT" "$AGG_SEMANTIC"
+  {
+    echo ""
+    echo "## Skill Roots Breakdown"
+    cat "$AGG_BREAKDOWN"
+  } >> "$AGG_REPORT"
+
+  "$HISTORY" "$TARGET" "$AGG_REPORT" "$AGG_FINDINGS"
+else
+  echo "ℹ️  judge: no skill roots detected, skip skill-review"
+  echo "- skill-review: skipped (no skill signals)" >> "$SUMMARY"
+fi
+
+if [ "$PROJECT_TYPE" = "code_only" ] || [ "$PROJECT_TYPE" = "hybrid" ]; then
+  echo "🧩 judge: running code pipeline (default full baseline)"
+  "$RUN_CODE" "$TARGET"
+  {
+    echo ""
+    echo "## Code Pipeline"
+    echo "- Deterministic full baseline generated (code-explore/design-lens/demon-hunter/token-optimize if missing)."
+    echo "- For semantic depth, run code-explore/design-lens/demon-hunter explicitly."
+  } >> "$SUMMARY"
+fi
+
+ensure_view_binary
+if [ -x "$VIEW_BIN" ]; then
+  echo "📊 judge: updating root dashboard"
+  "$VIEW_BIN" "$TARGET" >/dev/null 2>&1 || true
+fi
+
+echo ""
+echo "## Next Actions" >> "$SUMMARY"
+echo "1. Open root dashboard: $OUT_DIR/dashboard.html" >> "$SUMMARY"
+echo "2. For deeper semantic analysis, run code-explore/design-lens/demon-hunter/token-optimize explicitly." >> "$SUMMARY"
+
+echo "DONE"
+echo "  profile: $PROFILE"
+echo "  summary: $SUMMARY"

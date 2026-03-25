@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# run-code-pipeline
+# Deterministic full baseline code pipeline:
+# - generate code-explore.md   (if missing, or --force)
+# - generate design-lens.md    (if missing, or --force)
+# - generate demon-hunter.md   (if missing, or --force)
+# - generate token-optimize.md (if missing, or --force)
+#
+# Usage:
+#   run-code-pipeline <target-dir> [--force]
+
+TARGET="${1:-.}"
+FORCE="${2:-}"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: python3 is required" >&2
+  exit 1
+fi
+
+OUT_DIR="$TARGET/.judge-the-code"
+EXPLORE_MD="$OUT_DIR/code-explore.md"
+DESIGN_MD="$OUT_DIR/design-lens.md"
+DEMON_MD="$OUT_DIR/demon-hunter.md"
+OPT_MD="$OUT_DIR/token-optimize.md"
+mkdir -p "$OUT_DIR"
+
+write_explore=0
+write_design=0
+write_demon=0
+write_opt=0
+if [ "$FORCE" = "--force" ] || [ ! -f "$EXPLORE_MD" ]; then write_explore=1; fi
+if [ "$FORCE" = "--force" ] || [ ! -f "$DESIGN_MD" ]; then write_design=1; fi
+if [ "$FORCE" = "--force" ] || [ ! -f "$DEMON_MD" ]; then write_demon=1; fi
+if [ "$FORCE" = "--force" ] || [ ! -f "$OPT_MD" ]; then write_opt=1; fi
+
+if [ "$write_explore" -eq 0 ] && [ "$write_design" -eq 0 ] && [ "$write_demon" -eq 0 ] && [ "$write_opt" -eq 0 ]; then
+  echo "SKIP: code baseline reports already exist (use --force to refresh)"
+  exit 0
+fi
+
+python3 - "$TARGET" "$EXPLORE_MD" "$DESIGN_MD" "$DEMON_MD" "$OPT_MD" "$write_explore" "$write_design" "$write_demon" "$write_opt" <<'PY'
+import os
+import re
+import sys
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
+
+target = Path(sys.argv[1]).resolve()
+explore_md = Path(sys.argv[2])
+design_md = Path(sys.argv[3])
+demon_md = Path(sys.argv[4])
+opt_md = Path(sys.argv[5])
+write_explore = sys.argv[6] == "1"
+write_design = sys.argv[7] == "1"
+write_demon = sys.argv[8] == "1"
+write_opt = sys.argv[9] == "1"
+
+ignore = {".git", ".judge-the-code", "node_modules", ".venv", "__pycache__", "dist", "build", ".next"}
+ext_map = {
+    ".py": "Python",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".js": "JavaScript",
+    ".jsx": "JavaScript",
+    ".go": "Go",
+    ".java": "Java",
+    ".kt": "Kotlin",
+    ".rs": "Rust",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".cs": "C#",
+    ".cpp": "C++",
+    ".c": "C",
+}
+llm_pattern = re.compile(
+    r"(messages\.create|chat\.completions|openai|anthropic|langchain|llamaindex|api\.openai\.com|api\.anthropic\.com)",
+    re.IGNORECASE,
+)
+
+lang_counter = Counter()
+top_dirs = Counter()
+llm_hits = []
+security_hits = []
+
+for root, dirs, files in os.walk(target):
+    dirs[:] = [d for d in dirs if d not in ignore]
+    r = Path(root)
+    rel_root = r.relative_to(target)
+    if rel_root.parts:
+        top_dirs[rel_root.parts[0]] += len(files)
+    for fn in files:
+        p = r / fn
+        ext = p.suffix.lower()
+        if ext in ext_map:
+            lang_counter[ext_map[ext]] += 1
+        try:
+            if ext in {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rs", ".rb", ".php", ".md"}:
+                txt = p.read_text(encoding="utf-8", errors="ignore")
+                for i, line in enumerate(txt.splitlines(), start=1):
+                    if llm_pattern.search(line):
+                        llm_hits.append((str(p.relative_to(target)), i, line.strip()[:180]))
+                        if len(llm_hits) >= 30:
+                            break
+                    if re.search(r"(password\s*=|api[_-]?key|secret|token\s*=|eval\(|exec\(|subprocess\.Popen|shell=True)", line, flags=re.IGNORECASE):
+                        security_hits.append((str(p.relative_to(target)), i, line.strip()[:180]))
+                        if len(security_hits) >= 40:
+                            break
+        except Exception:
+            pass
+
+project = target.name
+now = datetime.now().strftime("%Y-%m-%d %H:%M")
+top_langs = [f"{k} ({v} files)" for k, v in lang_counter.most_common(5)] or ["未识别"]
+top_dirs_rows = [(k, v) for k, v in top_dirs.most_common(8)] or [(".", 0)]
+
+ptype = "Library/Service"
+if (target / "SKILL.md").exists():
+    ptype = "Hybrid (Code + Skill)"
+elif (target / "scripts").exists() and not (target / "src").exists():
+    ptype = "CLI Tool"
+elif (target / "src").exists() and ((target / "package.json").exists() or (target / "requirements.txt").exists()):
+    ptype = "Application"
+
+if write_explore:
+    lines = []
+    lines.append(f"# {project} — 项目理解指南（Deterministic Baseline）")
+    lines.append("")
+    lines.append(f"> 生成时间: {now} | 分析工具: run-code-pipeline")
+    lines.append("")
+    lines.append("## TL;DR")
+    lines.append(f"- 项目类型: {ptype}")
+    lines.append(f"- 主要语言: {', '.join(top_langs)}")
+    lines.append("- 说明: 这是自动化基线报告；如需深度洞察，请运行完整 code-explore skill。")
+    lines.append("")
+    lines.append("## 技术栈一览")
+    lines.append("| 维度 | 结果 |")
+    lines.append("|------|------|")
+    lines.append(f"| 项目类型 | {ptype} |")
+    lines.append(f"| 主要语言 | {', '.join(top_langs)} |")
+    lines.append(f"| 关键清单文件 | {', '.join([x for x in ['package.json','go.mod','requirements.txt','pyproject.toml','SKILL.md'] if (target/x).exists()]) or '未发现'} |")
+    lines.append("")
+    lines.append("## 目录热点（按文件数）")
+    lines.append("| 目录 | 文件数 |")
+    lines.append("|------|--------|")
+    for d, c in top_dirs_rows:
+        lines.append(f"| `{d}` | {c} |")
+    lines.append("")
+    lines.append("## 后续建议")
+    lines.append("1. 运行 code-explore 获取完整架构图与入口流程。")
+    lines.append("2. 运行 design-lens 提取设计决策与可学习模式。")
+    lines.append("3. 运行 demon-hunter 做安全与依赖风险审查。")
+    explore_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+if write_design:
+    lines = []
+    lines.append(f"# {project} — 设计哲学报告（Deterministic Baseline）")
+    lines.append("")
+    lines.append(f"> 生成时间: {now} | 分析工具: run-code-pipeline")
+    lines.append("")
+    lines.append("## 代码风格画像")
+    lines.append(f"- 主语言分布: {', '.join(top_langs)}")
+    lines.append(f"- 目录组织倾向: {', '.join([d for d,_ in top_dirs_rows[:5]])}")
+    lines.append("- 判断说明: 该报告为静态结构基线，不替代完整 design-lens 语义分析。")
+    lines.append("")
+    lines.append("## 值得关注的决策点")
+    lines.append("- 是否存在单体脚本/大文件集中逻辑。")
+    lines.append("- 是否有清晰分层（routes/services/repository 或等价结构）。")
+    lines.append("- 测试目录与业务目录是否成体系。")
+    lines.append("")
+    lines.append("## 建议")
+    lines.append("1. 对核心目录进行命名一致性和抽象层级审查。")
+    lines.append("2. 对错误处理策略做统一（返回码/异常传播/日志策略）。")
+    lines.append("3. 运行 design-lens 获取决策级语义评价。")
+    design_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+if write_demon:
+    lines = []
+    lines.append(f"# {project} — 风险审查报告（Deterministic Baseline）")
+    lines.append("")
+    lines.append(f"> 生成时间: {now} | 分析工具: run-code-pipeline")
+    lines.append("")
+    lines.append("## 线索统计")
+    lines.append(f"- 潜在安全线索: {len(security_hits)} 条（关键词静态匹配）")
+    lines.append(f"- 潜在 LLM 调用线索: {len(llm_hits)} 条")
+    lines.append("")
+    lines.append("## 安全线索（Top 15）")
+    lines.append("| 位置 | 片段 |")
+    lines.append("|------|------|")
+    if security_hits:
+        for f, ln, snippet in security_hits[:15]:
+            lines.append(f"| `{f}:{ln}` | `{snippet.replace('`','\\`')}` |")
+    else:
+        lines.append("| 无 | - |")
+    lines.append("")
+    lines.append("## 结论")
+    if security_hits:
+        lines.append("- 检测到潜在风险线索，建议运行完整 demon-hunter（SAST/CVE/secret）。")
+    else:
+        lines.append("- 未发现明显高风险关键词，建议仍执行完整安全审查。")
+    demon_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+if write_opt:
+    lines = []
+    lines.append(f"# {project} — Token 优化诊断报告（Deterministic Baseline）")
+    lines.append("")
+    lines.append(f"> 生成时间: {now} | 分析工具: run-code-pipeline")
+    lines.append("")
+    lines.append("## 📊 交互点全局盘点")
+    lines.append("")
+    lines.append(f"本项目发现 **{len(llm_hits)}** 条潜在 LLM 交互线索（静态关键词匹配）。")
+    lines.append("")
+    lines.append("| 位置 | 片段 |")
+    lines.append("|------|------|")
+    if llm_hits:
+        for f, ln, snippet in llm_hits[:15]:
+            lines.append(f"| `{f}:{ln}` | `{snippet.replace('`','\\`')}` |")
+    else:
+        lines.append("| 无 | - |")
+    lines.append("")
+    lines.append("## 结论")
+    if llm_hits:
+        lines.append("- 建议对上述调用点执行完整 token-optimize skill 深度分析。")
+    else:
+        lines.append("- 未发现明显 LLM 调用关键词，当前 token 风险较低。")
+    opt_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+print(f"WROTE_EXPLORE={write_explore}")
+print(f"WROTE_DESIGN={write_design}")
+print(f"WROTE_DEMON={write_demon}")
+print(f"WROTE_OPTIMIZE={write_opt}")
+PY

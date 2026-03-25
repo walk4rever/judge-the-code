@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# detect-project-type
+# Classify repo as: code_only / skill_only / hybrid / unknown
+#
+# Usage:
+#   detect-project-type [target-dir] [output-json]
+
+TARGET="${1:-.}"
+OUT="${2:-$TARGET/.judge-the-code/project-profile.json}"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: python3 is required" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$OUT")"
+
+python3 - "$TARGET" "$OUT" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+target = Path(sys.argv[1]).resolve()
+out = Path(sys.argv[2])
+
+ignore_dirs = {
+    ".git", ".judge-the-code", "node_modules", ".venv",
+    "dist", "build", ".next", "__pycache__", ".idea",
+}
+
+code_files = {
+    "package.json", "go.mod", "requirements.txt", "pyproject.toml",
+    "Cargo.toml", "pom.xml", "build.gradle", "build.gradle.kts",
+    "composer.json", "Gemfile",
+}
+code_dirs = {"src", "tests", "test", "app", "cmd", "internal", "lib"}
+
+skill_roots = set()
+code_signals = []
+skill_signals = []
+
+def walk_dir(p: Path, depth: int = 0):
+    if depth > 7:
+        return
+    try:
+        entries = list(p.iterdir())
+    except Exception:
+        return
+    for e in entries:
+        if e.name in ignore_dirs:
+            continue
+        if e.is_dir():
+            if e.name in code_dirs:
+                code_signals.append(str(e))
+            walk_dir(e, depth + 1)
+            continue
+        if not e.is_file():
+            continue
+        if e.name in code_files:
+            code_signals.append(str(e))
+        if e.name == "SKILL.md":
+            root = e.parent.resolve()
+            skill_roots.add(str(root))
+            skill_signals.append(str(e))
+        elif "agents" in e.parts and e.suffix == ".md":
+            skill_signals.append(str(e))
+
+walk_dir(target)
+
+has_code = len(code_signals) > 0
+has_skill = len(skill_signals) > 0
+
+if has_code and has_skill:
+    project_type = "hybrid"
+elif has_skill:
+    project_type = "skill_only"
+elif has_code:
+    project_type = "code_only"
+else:
+    project_type = "unknown"
+
+obj = {
+    "target": str(target),
+    "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "project_type": project_type,
+    "code_signals_count": len(code_signals),
+    "skill_signals_count": len(skill_signals),
+    "skill_roots": sorted(skill_roots),
+    "code_signals_sample": sorted(set(code_signals))[:30],
+    "skill_signals_sample": sorted(set(skill_signals))[:30],
+}
+out.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+print(f"TYPE={project_type}")
+print(f"SKILL_ROOTS={len(skill_roots)}")
+print(f"WROTE={out}")
+PY

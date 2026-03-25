@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# update-skill-review-history
+# Append one run snapshot into:
+#   <target>/.judge-the-code/state/skill-review-history.json
+#
+# Usage:
+#   update-skill-review-history <target-dir> <report-md> <findings-json>
+
+TARGET="${1:-.}"
+REPORT="${2:-$TARGET/.judge-the-code/skill-review.md}"
+FINDINGS="${3:-$TARGET/.judge-the-code/skill-review-findings.json}"
+HISTORY="$TARGET/.judge-the-code/state/skill-review-history.json"
+
+if [ ! -f "$REPORT" ]; then
+  echo "SKIP_HISTORY: report not found: $REPORT"
+  exit 0
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "SKIP_HISTORY: python3 not found"
+  exit 0
+fi
+
+mkdir -p "$(dirname "$HISTORY")"
+
+python3 - "$REPORT" "$FINDINGS" "$HISTORY" <<'PY'
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+report_path = Path(sys.argv[1])
+findings_path = Path(sys.argv[2])
+history_path = Path(sys.argv[3])
+
+text = report_path.read_text(encoding="utf-8", errors="ignore")
+
+score = None
+for pat in (r"综合评分\s*[:：]\s*(\d{1,3})", r"\b(?:overall score|score)\b\s*[:：]\s*(\d{1,3})"):
+    m = re.search(pat, text, flags=re.IGNORECASE)
+    if m:
+        score = max(0, min(100, int(m.group(1))))
+        break
+
+grade = None
+for pat in (r"等级\s*[:：]\s*([A-D][+-]?)", r"\bgrade\b\s*[:：]\s*([A-D][+-]?)"):
+    m = re.search(pat, text, flags=re.IGNORECASE)
+    if m:
+        grade = m.group(1).upper()
+        break
+
+sev = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+if findings_path.exists():
+    try:
+        obj = json.loads(findings_path.read_text(encoding="utf-8", errors="ignore"))
+        for f in obj.get("findings", []):
+            s = str(f.get("severity", "")).lower()
+            if s in sev:
+                sev[s] += 1
+    except Exception:
+        pass
+
+entry = {
+    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "score": score,
+    "grade": grade,
+    "findings": sev,
+}
+
+history = {"version": 1, "runs": []}
+if history_path.exists():
+    try:
+        history = json.loads(history_path.read_text(encoding="utf-8", errors="ignore"))
+        if not isinstance(history, dict):
+            history = {"version": 1, "runs": []}
+        if not isinstance(history.get("runs"), list):
+            history["runs"] = []
+    except Exception:
+        history = {"version": 1, "runs": []}
+
+history["version"] = 1
+history["runs"].append(entry)
+history["runs"] = history["runs"][-30:]
+
+history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+print(f"WROTE={history_path}")
+PY

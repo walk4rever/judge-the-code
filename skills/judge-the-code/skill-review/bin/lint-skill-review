@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# lint-skill-review
+# Deterministic lint for Skill/Prompt engineering projects.
+# Usage:
+#   lint-skill-review <target-dir> [output-json]
+# Example:
+#   lint-skill-review . .judge-the-code/skill-review-findings.json
+
+TARGET="${1:-.}"
+OUT="${2:-$TARGET/.judge-the-code/skill-review-findings.json}"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
+
+SKILL_FILES=()
+while IFS= read -r file; do
+  SKILL_FILES+=("$file")
+done < <(find "$TARGET" -maxdepth 6 -type f \( -name "SKILL.md" -o -path "*/agents/*.md" \) | sort)
+if [ "${#SKILL_FILES[@]}" -eq 0 ]; then
+  mkdir -p "$(dirname "$OUT")"
+  printf '{\n  "target": "%s",\n  "generated_at": "%s",\n  "findings": []\n}\n' \
+    "$TARGET" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$OUT"
+  echo "WROTE=$OUT"
+  exit 0
+fi
+
+add_finding() {
+  # rule | severity | file | line | message | suggestion
+  local line="$4"
+  if ! [[ "$line" =~ ^[0-9]+$ ]]; then
+    line="1"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$line" "$5" "$6" >> "$TMP"
+}
+
+has_pattern_any() {
+  # has_pattern_any "<regex>" <files...>
+  local pattern="$1"
+  shift
+  rg -n --pcre2 "$pattern" "$@" >/dev/null 2>&1
+}
+
+first_match_line() {
+  # first_match_line "<regex>" <files...>
+  local pattern="$1"
+  shift
+  rg -n --pcre2 "$pattern" "$@" | head -1 | cut -d: -f1,2
+}
+
+# Rule 1: Input validation branch coverage
+if ! has_pattern_any 'EMPTY' "${SKILL_FILES[@]}" || \
+   ! has_pattern_any 'NOT_FOUND' "${SKILL_FILES[@]}" || \
+   ! has_pattern_any 'IS_FILE' "${SKILL_FILES[@]}" || \
+   ! has_pattern_any 'OK' "${SKILL_FILES[@]}"; then
+  first="${SKILL_FILES[0]}"
+  add_finding \
+    "missing_input_validation" \
+    "high" \
+    "$first" \
+    "1" \
+    "Missing complete path validation branches (EMPTY/NOT_FOUND/IS_FILE/OK)." \
+    "Add explicit Phase 0 validation with STOP branches for invalid input."
+fi
+
+# Rule 2: Fallback/degrade handling
+if ! has_pattern_any 'fallback|降级|SKIP_VIEW|MISSING|工具缺失|if \[ -x' "${SKILL_FILES[@]}"; then
+  first="${SKILL_FILES[0]}"
+  add_finding \
+    "missing_fallback" \
+    "medium" \
+    "$first" \
+    "1" \
+    "No fallback/degradation strategy detected for missing tools or failed steps." \
+    "Define fallback behavior and user-facing message for tool absence or partial failures."
+fi
+
+# Rule 3: Dangerous command detection
+# Only match shell-like executable lines to reduce markdown prose false positives.
+danger_hits="$(rg -nH --pcre2 '^\s*(rm\s+-rf|git\s+reset\s+--hard|DROP\s+TABLE|mkfs\.|:\(\)\s*\{\s*:\|\:&\s*\};:)\b' "${SKILL_FILES[@]}" || true)"
+if [ -n "$danger_hits" ]; then
+  while IFS= read -r hit; do
+    f="${hit%%:*}"
+    rest="${hit#*:}"
+    l="${rest%%:*}"
+    add_finding \
+      "dangerous_command_present" \
+      "critical" \
+      "$f" \
+      "$l" \
+      "Potentially destructive command found in skill instructions." \
+      "Require explicit confirmation and strict guardrails before any destructive command."
+  done <<< "$danger_hits"
+fi
+
+# Rule 4: Prompt injection boundary declaration
+if ! has_pattern_any 'Prompt Injection|注入|system.*user|用户输入.*系统指令|trusted|untrusted|边界' "${SKILL_FILES[@]}"; then
+  first="${SKILL_FILES[0]}"
+  add_finding \
+    "missing_injection_boundary" \
+    "high" \
+    "$first" \
+    "1" \
+    "No explicit prompt injection boundary guidance detected." \
+    "Document trusted vs untrusted inputs and enforce separation of system constraints from user content."
+fi
+
+# Rule 5: Parallel dependency conflict hints
+parallel_hits="$(rg -nH --pcre2 '并行|parallel' "${SKILL_FILES[@]}" || true)"
+if [ -n "$parallel_hits" ]; then
+  dep_hits="$(rg -nH --pcre2 '读取.*Agent [0-9]|依赖.*Agent [0-9]|consume.*Agent [0-9]|depends on Agent [0-9]' "${SKILL_FILES[@]}" || true)"
+  if [ -n "$dep_hits" ]; then
+    while IFS= read -r hit; do
+      f="${hit%%:*}"
+      rest="${hit#*:}"
+      l="${rest%%:*}"
+      add_finding \
+        "parallel_hidden_dependency" \
+        "medium" \
+        "$f" \
+        "$l" \
+        "Possible hidden serial dependency under a parallel execution claim." \
+        "Split into explicit serial phase or remove data dependency between parallel agents."
+    done <<< "$dep_hits"
+  fi
+fi
+
+# Rule 6: Overlong prompt files (token risk)
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  lines="$(wc -l < "$file" | tr -d ' ')"
+  if [ "$lines" -gt 450 ]; then
+    add_finding \
+      "overlong_prompt_file" \
+      "medium" \
+      "$file" \
+      "1" \
+      "Very long instruction file detected (${lines} lines), likely to increase token cost and ambiguity." \
+      "Refactor into smaller referenced modules and keep the dispatcher concise."
+  fi
+done < <(printf '%s\n' "${SKILL_FILES[@]}")
+
+mkdir -p "$(dirname "$OUT")"
+
+# Render JSON manually from TSV rows.
+{
+  printf '{\n'
+  printf '  "target": "%s",\n' "$TARGET"
+  printf '  "generated_at": "%s",\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  printf '  "findings": [\n'
+  if [ -s "$TMP" ]; then
+    awk -F '\t' '
+      function esc(s) {
+        gsub(/\\/,"\\\\",s)
+        gsub(/"/,"\\\"",s)
+        gsub(/\r/,"\\r",s)
+        gsub(/\n/,"\\n",s)
+        gsub(/\t/,"\\t",s)
+        return s
+      }
+      {
+        printf "%s    {\"rule\":\"%s\",\"severity\":\"%s\",\"file\":\"%s\",\"line\":%s,\"message\":\"%s\",\"suggestion\":\"%s\"}",
+               (NR==1 ? "" : ",\n"),
+               esc($1), esc($2), esc($3), $4, esc($5), esc($6)
+      }
+      END { if (NR>0) printf "\n" }
+    ' "$TMP"
+  fi
+  printf '  ]\n'
+  printf '}\n'
+} > "$OUT"
+
+echo "WROTE=$OUT"

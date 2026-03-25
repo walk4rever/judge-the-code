@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# generate-skill-review-report
+# Convert deterministic + semantic findings into .judge-the-code/skill-review.md
+#
+# Usage:
+#   generate-skill-review-report <target-dir> <findings-json> [output-md] [semantic-json]
+
+TARGET="${1:-.}"
+FINDINGS="${2:-$TARGET/.judge-the-code/skill-review-findings.json}"
+OUT="${3:-$TARGET/.judge-the-code/skill-review.md}"
+SEMANTIC="${4:-$TARGET/.judge-the-code/skill-review-semantic.json}"
+
+mkdir -p "$(dirname "$OUT")"
+
+if [ ! -f "$FINDINGS" ]; then
+  echo "error: findings json not found: $FINDINGS" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: python3 is required" >&2
+  exit 1
+fi
+
+python3 - "$TARGET" "$FINDINGS" "$OUT" "$SEMANTIC" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+target = sys.argv[1]
+findings_path = Path(sys.argv[2])
+out_path = Path(sys.argv[3])
+semantic_path = Path(sys.argv[4])
+
+obj = json.loads(findings_path.read_text(encoding="utf-8", errors="ignore"))
+det_findings = obj.get("findings", [])
+sem_obj = {}
+sem_findings = []
+if semantic_path.exists():
+    sem_obj = json.loads(semantic_path.read_text(encoding="utf-8", errors="ignore"))
+    sem_findings = sem_obj.get("findings", [])
+all_findings = det_findings + sem_findings
+
+sev_order = ["critical", "high", "medium", "low"]
+sev_zh = {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low"}
+weights = {"critical": 25, "high": 12, "medium": 5, "low": 2}
+
+counts = {k: 0 for k in sev_order}
+for f in all_findings:
+    s = str(f.get("severity", "")).lower()
+    if s in counts:
+        counts[s] += 1
+
+score = 100 - sum(counts[s] * weights[s] for s in sev_order)
+score = max(0, min(100, score))
+if score >= 90:
+    grade = "A"
+elif score >= 75:
+    grade = "B"
+elif score >= 60:
+    grade = "C"
+else:
+    grade = "D"
+
+rule_dim = {
+    "missing_input_validation": "输入验证",
+    "missing_fallback": "容错与降级",
+    "dangerous_command_present": "安全边界",
+    "missing_injection_boundary": "安全边界",
+    "parallel_hidden_dependency": "Agent 编排",
+    "overlong_prompt_file": "Token 效率",
+}
+
+dim_names = [
+    "Prompt 清晰度",
+    "执行流设计",
+    "输入验证",
+    "Agent 编排",
+    "容错与降级",
+    "Token 效率",
+    "安全边界",
+    "模型兼容性",
+]
+dim_scores = {k: 8 for k in dim_names}
+
+for f in det_findings:
+    rule = str(f.get("rule", ""))
+    sev = str(f.get("severity", "")).lower()
+    dim = rule_dim.get(rule)
+    if not dim:
+        continue
+    penalty = {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(sev, 1)
+    dim_scores[dim] = max(0, dim_scores[dim] - penalty)
+
+# Merge semantic dimension scores when available.
+sem_dims = {x.get("name"): x.get("score") for x in sem_obj.get("dimensions", []) if isinstance(x, dict)}
+for d in dim_names:
+    sv = sem_dims.get(d)
+    if isinstance(sv, int):
+        dim_scores[d] = max(0, min(10, min(dim_scores[d], sv)))
+
+dim_comments = {}
+for d in dim_names:
+    v = dim_scores[d]
+    if v >= 8:
+        dim_comments[d] = "稳定"
+    elif v >= 6:
+        dim_comments[d] = "可用但建议优化"
+    else:
+        dim_comments[d] = "存在明显改进空间"
+
+grouped = {k: [] for k in sev_order}
+for f in all_findings:
+    s = str(f.get("severity", "")).lower()
+    if s in grouped:
+        grouped[s].append(f)
+
+def line_of(f):
+    try:
+        return int(f.get("line", 1))
+    except Exception:
+        return 1
+
+for s in sev_order:
+    grouped[s].sort(key=lambda x: (str(x.get("file", "")), line_of(x)))
+
+summary = []
+if not all_findings:
+    summary = ["未发现规则或语义层问题。", "当前实现可直接使用，建议保持迭代验证。"]
+else:
+    summary = [
+        f"共发现 {len(all_findings)} 条问题（规则 {len(det_findings)} + 语义 {len(sem_findings)}，Critical {counts['critical']} / High {counts['high']} / Medium {counts['medium']} / Low {counts['low']}）。",
+        "建议优先清理高严重度问题，再优化执行流清晰度与模型兼容性。",
+    ]
+
+fixes = []
+for s in sev_order:
+    for f in grouped[s]:
+        sug = str(f.get("suggestion", "")).strip()
+        if not sug:
+            continue
+        if sug not in fixes:
+            fixes.append(sug)
+
+project = os.path.basename(os.path.abspath(target)) or target
+now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+lines = []
+lines.append(f"# {project} — Skill Review 报告")
+lines.append("")
+lines.append(f"> 生成时间: {now} | 分析工具: skill-review (deterministic + semantic)")
+lines.append("")
+lines.append("## 总评")
+lines.append(f"- 综合评分: {score}")
+lines.append(f"- 等级: {grade}")
+for s in summary:
+    lines.append(f"- 结论: {s}")
+lines.append("")
+lines.append("## 八维评分")
+lines.append("| 维度 | 分数 | 结论 |")
+lines.append("|------|------|------|")
+for d in dim_names:
+    lines.append(f"| {d} | {dim_scores[d]}/10 | {dim_comments[d]} |")
+lines.append("")
+lines.append("## Findings（按严重级别）")
+for s in sev_order:
+    lines.append(f"### {sev_zh[s]}")
+    if not grouped[s]:
+        lines.append("- 无")
+        continue
+    for f in grouped[s]:
+        file = f.get("file", "")
+        line = line_of(f)
+        msg = str(f.get("message", "")).strip()
+        sug = str(f.get("suggestion", "")).strip()
+        lines.append(f"- `{file}:{line}` {msg}")
+        if sug:
+            lines.append(f"  - 修复建议: {sug}")
+        src = f.get("source")
+        dim = f.get("dimension")
+        if src or dim:
+            note = []
+            if src:
+                note.append(f"来源: {src}")
+            if dim:
+                note.append(f"维度: {dim}")
+            lines.append(f"  - {' | '.join(note)}")
+lines.append("")
+lines.append("## 语义审查发现（按维度）")
+if not sem_findings:
+    lines.append("- 无")
+else:
+    sem_by_dim = {}
+    for f in sem_findings:
+        d = str(f.get("dimension", "未分类"))
+        sem_by_dim.setdefault(d, []).append(f)
+    for d in dim_names:
+        arr = sem_by_dim.get(d, [])
+        if not arr:
+            continue
+        lines.append(f"### {d}")
+        for f in arr:
+            file = f.get("file", "")
+            line = line_of(f)
+            msg = str(f.get("message", "")).strip()
+            sug = str(f.get("suggestion", "")).strip()
+            lines.append(f"- `{file}:{line}` {msg}")
+            if sug:
+                lines.append(f"  - 修复建议: {sug}")
+lines.append("")
+lines.append("## Top 5 Fixes（按 ROI）")
+if fixes:
+    for i, fx in enumerate(fixes[:5], start=1):
+        lines.append(f"{i}. {fx}")
+else:
+    lines.append("1. 当前无需额外修复，建议保持回归检查。")
+
+out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+print(f"WROTE={out_path}")
+PY

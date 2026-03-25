@@ -37,6 +37,7 @@ func main() {
 		{ID: "lens", Label: "design-lens", Icon: "🔍", File: "design-lens.md"},
 		{ID: "hunter", Label: "demon-hunter", Icon: "👹", File: "demon-hunter.md"},
 		{ID: "optimize", Label: "token-optimize", Icon: "🪙", File: "token-optimize.md"},
+		{ID: "review", Label: "skill-review", Icon: "🧭", File: "skill-review.md"},
 	}
 
 	for i, s := range skills {
@@ -55,6 +56,19 @@ func main() {
 		encoded, _ := json.Marshal(s.Content)
 		html = strings.ReplaceAll(html, placeholder, string(encoded))
 	}
+
+	// Inject skill-review history JSON (optional)
+	historyRaw, err := os.ReadFile(filepath.Join(dir, "state", "skill-review-history.json"))
+	historyJSON := "null"
+	if err == nil {
+		var anyJSON interface{}
+		if json.Unmarshal(historyRaw, &anyJSON) == nil {
+			if b, e := json.Marshal(anyJSON); e == nil {
+				historyJSON = string(b)
+			}
+		}
+	}
+	html = strings.ReplaceAll(html, "<!--CONTENT_REVIEW_HISTORY-->", historyJSON)
 
 	// Inject generated time
 	html = strings.ReplaceAll(html, "<!--GENERATED_AT-->", time.Now().Format("2006-01-02 15:04"))

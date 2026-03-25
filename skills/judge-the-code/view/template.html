@@ -130,6 +130,53 @@ header h1 span { color: #58a6ff; }
 .md-body ul, .md-body ol { padding-left: 20px; margin: 8px 0; }
 .md-body li { margin: 4px 0; color: #c9d1d9; }
 .md-body hr { border: none; border-top: 1px solid #21262d; margin: 28px 0; }
+.trend-box {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+}
+.trend-title { color: #e1e4e8; font-weight: 600; margin-bottom: 8px; font-size: 13px; }
+.trend-meta { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
+.trend-list { color: #c9d1d9; font-size: 13px; line-height: 1.5; font-family: "SF Mono", "Fira Code", monospace; }
+.trend-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 12px;
+}
+.trend-chart {
+  width: 100%;
+  height: 130px;
+  background: #0f1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 8px;
+}
+.trend-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.trend-kpi {
+  background: #0f1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 8px;
+}
+.trend-kpi .k {
+  color: #8b949e;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.trend-kpi .v {
+  color: #e1e4e8;
+  font-size: 18px;
+  font-weight: 700;
+}
+.delta-up { color: #ff7b72; }
+.delta-down { color: #3fb950; }
+.delta-flat { color: #8b949e; }
 
 /* ── Mermaid diagrams ── */
 .mermaid {
@@ -184,26 +231,35 @@ header h1 span { color: #58a6ff; }
     <span class="icon">🪙</span>token-optimize
     <span class="badge" id="badge-optimize">—</span>
   </button>
+  <button class="tab-btn" onclick="show('review')" id="tab-review">
+    <span class="icon">🧭</span>skill-review
+    <span class="badge" id="badge-review">—</span>
+  </button>
 </div>
 
 <div id="panel-explore" class="panel active"></div>
 <div id="panel-lens" class="panel"></div>
 <div id="panel-hunter" class="panel"></div>
 <div id="panel-optimize" class="panel"></div>
+<div id="panel-review" class="panel"></div>
 
 <script>
 const content = {
   explore: <!--CONTENT_EXPLORE-->,
   lens:    <!--CONTENT_LENS-->,
   hunter:  <!--CONTENT_HUNTER-->,
-  optimize: <!--CONTENT_OPTIMIZE-->
+  optimize: <!--CONTENT_OPTIMIZE-->,
+  review:  <!--CONTENT_REVIEW-->
 };
+const reviewHistory = <!--CONTENT_REVIEW_HISTORY-->;
+const TAB_IDS = ['explore', 'lens', 'hunter', 'optimize', 'review'];
 
 const EMPTY_MSGS = {
   explore:  { cmd: '/code-explore .', msg: '尚未运行 code-explore' },
   lens:     { cmd: '/design-lens .', msg: '尚未运行 design-lens' },
   hunter:   { cmd: '/demon-hunter .', msg: '尚未运行 demon-hunter' },
   optimize: { cmd: '/token-optimize .', msg: '尚未运行 token-optimize' },
+  review:   { cmd: '/skill-review .', msg: '尚未运行 skill-review' },
 };
 
 // ── markdown-it setup ──
@@ -243,6 +299,26 @@ async function renderPanel(id) {
     badge.style.color = '#fff';
   }
 
+  if (id === 'review') {
+    injectReviewTrend(panel);
+    const score = extractReviewScore(raw);
+    if (score !== null) {
+      badge.textContent = String(score);
+      if (score >= 85) {
+        badge.style.background = '#238636';
+        badge.style.color = '#fff';
+      } else if (score >= 70) {
+        badge.style.background = '#9a6700';
+        badge.style.color = '#fff';
+      } else {
+        badge.style.background = '#b91c1c';
+        badge.style.color = '#fff';
+      }
+    } else {
+      badge.textContent = '✓';
+    }
+  }
+
   // Extract and render mermaid blocks
   panel.querySelectorAll('pre code').forEach(block => {
     const lang = [...block.classList].find(c => c.startsWith('language-'));
@@ -279,6 +355,128 @@ function countFindings(raw) {
   return matches ? matches.length : '✓';
 }
 
+function extractReviewScore(raw) {
+  const cn = raw.match(/综合评分\s*[:：]\s*(\d{1,3})/i);
+  if (cn) return clampScore(parseInt(cn[1], 10));
+  const en = raw.match(/\b(score|overall score)\b\s*[:：]\s*(\d{1,3})/i);
+  if (en) return clampScore(parseInt(en[2], 10));
+  return null;
+}
+
+function clampScore(v) {
+  if (Number.isNaN(v)) return null;
+  if (v < 0) return 0;
+  if (v > 100) return 100;
+  return v;
+}
+
+function injectReviewTrend(panel) {
+  if (!reviewHistory || !Array.isArray(reviewHistory.runs) || reviewHistory.runs.length === 0) {
+    return;
+  }
+  const runs = reviewHistory.runs.slice(-5);
+  const last = runs[runs.length - 1];
+  const prev = runs.length > 1 ? runs[runs.length - 2] : null;
+  const lastScore = Number.isInteger(last.score) ? last.score : null;
+  const prevScore = prev && Number.isInteger(prev.score) ? prev.score : null;
+  let deltaTxt = 'n/a';
+  let deltaCls = 'delta-flat';
+  if (lastScore !== null && prevScore !== null) {
+    const d = lastScore - prevScore;
+    deltaTxt = d > 0 ? `+${d}` : `${d}`;
+    deltaCls = d > 0 ? 'delta-down' : (d < 0 ? 'delta-up' : 'delta-flat');
+  }
+
+  const lastFind = last.findings || {};
+  const prevFind = (prev && prev.findings) ? prev.findings : {};
+  const dCritical = (lastFind.critical || 0) - (prevFind.critical || 0);
+  const dHigh = (lastFind.high || 0) - (prevFind.high || 0);
+
+  const criticalDelta = formatDelta(dCritical, true);
+  const highDelta = formatDelta(dHigh, true);
+  const scorePoints = runs
+    .map((r, i) => ({ i, score: Number.isInteger(r.score) ? r.score : null }))
+    .filter(p => p.score !== null);
+
+  const lines = runs.map(r => {
+    const t = (r.timestamp || '').replace('T', ' ').replace('Z', '');
+    const s = Number.isInteger(r.score) ? r.score : '--';
+    const g = r.grade || '--';
+    return `${t}  score=${s}  grade=${g}`;
+  }).join('<br>');
+
+  const box = document.createElement('div');
+  box.className = 'trend-box';
+  box.innerHTML = `
+    <div class="trend-title">skill-review 趋势</div>
+    <div class="trend-meta">最近分数变化: <span class="${deltaCls}">${deltaTxt}</span></div>
+    <div class="trend-grid">
+      <div>
+        ${renderScoreSparkline(scorePoints)}
+      </div>
+      <div class="trend-kpis">
+        <div class="trend-kpi">
+          <div class="k">Current Score</div>
+          <div class="v">${lastScore === null ? '--' : lastScore}</div>
+        </div>
+        <div class="trend-kpi">
+          <div class="k">Grade</div>
+          <div class="v">${last.grade || '--'}</div>
+        </div>
+        <div class="trend-kpi">
+          <div class="k">Critical Δ</div>
+          <div class="v ${criticalDelta.cls}">${criticalDelta.text}</div>
+        </div>
+        <div class="trend-kpi">
+          <div class="k">High Δ</div>
+          <div class="v ${highDelta.cls}">${highDelta.text}</div>
+        </div>
+      </div>
+    </div>
+    <div class="trend-list" style="margin-top:8px">${lines}</div>
+  `;
+  panel.prepend(box);
+}
+
+function formatDelta(v, inverseGood) {
+  if (!Number.isFinite(v)) return { text: 'n/a', cls: 'delta-flat' };
+  if (v === 0) return { text: '0', cls: 'delta-flat' };
+  const txt = v > 0 ? `+${v}` : `${v}`;
+  if (!inverseGood) return { text: txt, cls: v > 0 ? 'delta-down' : 'delta-up' };
+  return { text: txt, cls: v > 0 ? 'delta-up' : 'delta-down' };
+}
+
+function renderScoreSparkline(points) {
+  const width = 420;
+  const height = 114;
+  if (!points || points.length === 0) {
+    return `<div class="trend-chart" style="display:flex;align-items:center;justify-content:center;color:#6e7681;font-size:12px">No score history</div>`;
+  }
+  const xStep = points.length === 1 ? 0 : (width - 16) / (points.length - 1);
+  const poly = points.map((p, idx) => {
+    const x = 8 + idx * xStep;
+    const y = 8 + (100 - p.score) * ((height - 16) / 100);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  const circles = points.map((p, idx) => {
+    const x = 8 + idx * xStep;
+    const y = 8 + (100 - p.score) * ((height - 16) / 100);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.8" fill="#58a6ff" />`;
+  }).join('');
+
+  return `
+    <svg class="trend-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+      <line x1="8" y1="${height - 8}" x2="${width - 8}" y2="${height - 8}" stroke="#30363d" stroke-width="1"/>
+      <line x1="8" y1="8" x2="8" y2="${height - 8}" stroke="#30363d" stroke-width="1"/>
+      <polyline fill="none" stroke="#58a6ff" stroke-width="2" points="${poly}" />
+      ${circles}
+      <text x="${width - 14}" y="16" text-anchor="end" fill="#8b949e" font-size="10">100</text>
+      <text x="${width - 14}" y="${height - 10}" text-anchor="end" fill="#8b949e" font-size="10">0</text>
+    </svg>
+  `;
+}
+
 // ── tabs ──
 function show(id) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -287,12 +485,37 @@ function show(id) {
   document.getElementById('tab-' + id).classList.add('active');
 }
 
+function setupVisibleTabs() {
+  let visible = TAB_IDS.filter(id => {
+    const raw = content[id];
+    return !!(raw && raw.trim() !== '');
+  });
+
+  // Keep at least one tab visible to avoid blank UI.
+  if (visible.length === 0) visible = ['explore'];
+
+  TAB_IDS.forEach(id => {
+    const tab = document.getElementById('tab-' + id);
+    const panel = document.getElementById('panel-' + id);
+    const keep = visible.includes(id);
+    tab.style.display = keep ? '' : 'none';
+    panel.style.display = keep ? '' : 'none';
+    tab.classList.remove('active');
+    panel.classList.remove('active');
+  });
+
+  document.getElementById('tab-' + visible[0]).classList.add('active');
+  document.getElementById('panel-' + visible[0]).classList.add('active');
+  return visible;
+}
+
 // ── init ──
 (async () => {
-  await renderPanel('explore');
-  await renderPanel('lens');
-  await renderPanel('hunter');
-  await renderPanel('optimize');
+  const visible = setupVisibleTabs();
+  for (const id of visible) {
+    await renderPanel(id);
+  }
+  show(visible[0]);
 })();
 </script>
 

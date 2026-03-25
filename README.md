@@ -72,7 +72,7 @@ token-optimize                 ← static analysis of LLM call sites
 | `design-lens` | Skill | Extract design philosophy and key decisions — find what's brilliant, reasonable, or questionable | ✅ Ready |
 | `demon-hunter` | Skill + Tools | Find security vulnerabilities, dependency CVEs, leaked secrets, performance traps, design hazards | ✅ Ready |
 | `token-optimize` | Skill | Discover token waste in LLM integrations — wallet black holes, attention pollution, unnecessary context | ✅ Ready |
-| `skill-review` | Skill | Review quality of Skill/Prompt engineering projects — prompt clarity, agent orchestration, injection risks | 🔜 Planned |
+| `skill-review` | Skill | Review quality of Skill/Prompt engineering projects — prompt clarity, agent orchestration, injection risks | 🚧 MVP |
 
 Together they form the full `judge-the-code` workflow:
 
@@ -84,11 +84,11 @@ code-explore  →  design-lens  →  demon-hunter  →  token-optimize
   Structure layer    Taste layer       Judgment layer     Economy layer
 ```
 
-### Coming next: `skill-review`
+### Skill/Prompt path: `skill-review`
 
 As the AI Agent ecosystem grows, more and more projects are not traditional source code — they are **Skill projects**: natural language prompts, agent definitions, execution flow orchestrations. Current tools (linters, SAST scanners, dependency auditors) are useless on these.
 
-`skill-review` will bring judge-the-code's philosophy to this new frontier:
+`skill-review` brings judge-the-code's philosophy to this new frontier:
 
 - **Prompt clarity** — Are instructions ambiguous? Would a weaker model misinterpret them?
 - **Execution flow design** — Are phases well-structured? Any dead ends or information gaps?
@@ -106,8 +106,18 @@ As the AI Agent ecosystem grows, more and more projects are not traditional sour
 /design-lens .        # Step 2: extract design philosophy
 /demon-hunter .       # Step 3: hunt for demons
 /token-optimize .     # Step 4: find token waste
+/skill-review .       # Skill/Prompt path: review prompt-engineering projects
 
 view .                # Open dashboard in browser
+
+# One-command deterministic skill-review (report + history + dashboard)
+~/.agents/skills/judge-the-code/skill-review/bin/run-skill-review .
+
+# Unified mixed-repo entrypoint (auto-detect code/skill/hybrid)
+~/.agents/skills/judge-the-code/bin/run-judge .
+# - hybrid/skill: runs skill-review automatically
+# - hybrid/code:  default full baseline (code-explore/design-lens/demon-hunter/token-optimize)
+# - all outputs are centralized at TARGET/.judge-the-code/
 ```
 
 ---
@@ -140,6 +150,7 @@ Generates `.judge-the-code/dashboard.html` and opens it in your browser. Renders
 ├── design-lens.md      ← design-lens report
 ├── demon-hunter.md     ← demon-hunter report
 ├── token-optimize.md   ← token-optimize report
+├── skill-review.md     ← skill-review report
 ├── dashboard.html      ← visual dashboard
 └── state/              ← internal skill state (ignore this)
 ```
@@ -165,7 +176,7 @@ Generates `.judge-the-code/dashboard.html` and opens it in your browser. Renders
 | demon-hunter | Security scanning (bearer + trivy + gitleaks) + semantic analysis | ✅ Shipped |
 | token-optimize | LLM token waste detection and optimization recommendations | ✅ Shipped |
 | code-explore hybrid | Deterministic tools (scc + syft) for architecture & dependency analysis | 🚧 In Progress |
-| skill-review | Quality review for Skill/Prompt engineering projects | 📋 Planned |
+| skill-review | Quality review for Skill/Prompt engineering projects | 🚧 MVP |
 
 ---
 

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# run-skill-review
+# End-to-end pipeline:
+# lint -> semantic pass -> report -> history -> dashboard
+#
+# Usage:
+#   run-skill-review [target-dir]
+
+TARGET="${1:-.}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILL_REVIEW_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SUITE_DIR="$(cd "$SKILL_REVIEW_DIR/.." && pwd)"
+VIEW_SRC_DIR="$SUITE_DIR/view"
+VIEW_BIN="$SUITE_DIR/bin/view"
+
+OUT_DIR="$TARGET/.judge-the-code"
+FINDINGS="$OUT_DIR/skill-review-findings.json"
+SEMANTIC="$OUT_DIR/skill-review-semantic.json"
+REPORT="$OUT_DIR/skill-review.md"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+
+ensure_view_binary() {
+  # Build view binary when missing or stale (template/main/go.mod changed).
+  local need_build=0
+  if [ ! -x "$VIEW_BIN" ]; then
+    need_build=1
+  elif [ "$VIEW_SRC_DIR/main.go" -nt "$VIEW_BIN" ] || \
+       [ "$VIEW_SRC_DIR/template.html" -nt "$VIEW_BIN" ] || \
+       [ "$VIEW_SRC_DIR/go.mod" -nt "$VIEW_BIN" ]; then
+    need_build=1
+  fi
+
+  if [ "$need_build" -eq 0 ]; then
+    return 0
+  fi
+
+  if ! command -v go >/dev/null 2>&1; then
+    echo "⚠️  go not found: skip rebuilding view binary (dashboard may be stale)"
+    return 0
+  fi
+
+  echo "🔧 skill-review: rebuilding view binary"
+  (cd "$VIEW_SRC_DIR" && go build -o "$VIEW_BIN" .)
+}
+
+echo "🔎 skill-review: linting"
+"$SCRIPT_DIR/lint-skill-review" "$TARGET" "$FINDINGS"
+
+echo "🧠 skill-review: semantic analysis"
+"$SCRIPT_DIR/semantic-skill-review" "$TARGET" "$SEMANTIC"
+
+echo "📝 skill-review: generating report"
+"$SCRIPT_DIR/generate-skill-review-report" "$TARGET" "$FINDINGS" "$REPORT" "$SEMANTIC"
+
+if [ -x "$SCRIPT_DIR/update-skill-review-history" ]; then
+  echo "📚 skill-review: updating history"
+  "$SCRIPT_DIR/update-skill-review-history" "$TARGET" "$REPORT" "$FINDINGS"
+fi
+
+ensure_view_binary
+if [ -x "$VIEW_BIN" ]; then
+  echo "📊 skill-review: updating dashboard"
+  "$VIEW_BIN" "$TARGET" >/dev/null 2>&1 || true
+fi
+
+echo "DONE"
+echo "  findings: $FINDINGS"
+echo "  semantic: $SEMANTIC"
+echo "  report:   $REPORT"
+echo "  dashboard:$OUT_DIR/dashboard.html"

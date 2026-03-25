@@ -72,7 +72,7 @@ token-optimize             ← 静态分析 LLM 调用点
 | `design-lens` | Skill | 提取设计哲学与关键决策，找到值得学习和质疑的地方 | ✅ 可用 |
 | `demon-hunter` | Skill + 工具 | 发现安全漏洞、依赖 CVE、密钥泄漏、性能隐患、设计陷阱 | ✅ 可用 |
 | `token-optimize` | Skill | 发现 LLM 集成中的 Token 浪费——钱包黑洞、注意力污染、无意义的上下文膨胀 | ✅ 可用 |
-| `skill-review` | Skill | 审查 Skill/Prompt 工程项目的质量——指令清晰度、Agent 编排、注入风险 | 🔜 规划中 |
+| `skill-review` | Skill | 审查 Skill/Prompt 工程项目的质量——指令清晰度、Agent 编排、注入风险 | 🚧 MVP |
 
 四个组件构成完整工作流：
 
@@ -83,11 +83,11 @@ code-explore  →  design-lens  →  demon-hunter  →  token-optimize
     结构层          欣赏层          判断层            经济层
 ```
 
-### 即将到来：`skill-review`
+### Skill/Prompt 路径：`skill-review`
 
 随着 AI Agent 生态的发展，越来越多的项目不再是传统源代码，而是 **Skill 项目**：自然语言 Prompt、Agent 定义、执行流编排。现有工具（lint、SAST 扫描器、依赖审计）对这些完全无用。
 
-`skill-review` 将把 judge-the-code 的理念带到这个新前沿：
+`skill-review` 把 judge-the-code 的理念带到这个新前沿：
 
 - **Prompt 清晰度** — 指令是否有歧义？低智商模型会不会理解出不同结果？
 - **执行流设计** — Phase 分层是否合理？有没有死路或信息断层？
@@ -105,8 +105,18 @@ code-explore  →  design-lens  →  demon-hunter  →  token-optimize
 /design-lens .        # 第二步：提炼设计哲学
 /demon-hunter .       # 第三步：猎杀恶魔
 /token-optimize .     # 第四步：找到 Token 浪费
+/skill-review .       # Skill/Prompt 路径：审查 Prompt 工程项目
 
 view .                # 在浏览器查看 dashboard
+
+# 一键跑完 deterministic skill-review（报告 + 历史 + dashboard）
+~/.agents/skills/judge-the-code/skill-review/bin/run-skill-review .
+
+# 混合项目统一入口（自动识别 code/skill/hybrid）
+~/.agents/skills/judge-the-code/bin/run-judge .
+# - hybrid/skill: 自动执行 skill-review
+# - hybrid/code: 默认 full baseline（code-explore/design-lens/demon-hunter/token-optimize）
+# - 全部产物统一落在 TARGET/.judge-the-code/
 ```
 
 ---
@@ -139,6 +149,7 @@ cp -r skills/judge-the-code ~/.agents/skills/
 ├── design-lens.md      ← design-lens 报告
 ├── demon-hunter.md     ← demon-hunter 报告
 ├── token-optimize.md   ← token-optimize 报告
+├── skill-review.md     ← skill-review 报告
 ├── dashboard.html      ← 可视化 dashboard
 └── state/              ← skill 内部状态（不用管）
 ```
@@ -164,7 +175,7 @@ cp -r skills/judge-the-code ~/.agents/skills/
 | demon-hunter | 安全扫描（bearer + trivy + gitleaks）+ 语义分析 | ✅ 已发布 |
 | token-optimize | LLM Token 浪费检测与优化建议 | ✅ 已发布 |
 | code-explore 混合架构 | 确定性工具（scc + syft）用于架构与依赖分析 | 🚧 进行中 |
-| skill-review | Skill/Prompt 工程项目的质量审查 | 📋 规划中 |
+| skill-review | Skill/Prompt 工程项目的质量审查 | 🚧 MVP |
 
 ---
 
