@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# judge-the-code setup — initialize the current skill directory in place
-# Run this script from whatever location you store this skill in.
+# judge-the-code setup — initialize shared tooling for the monorepo.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
-BIN_DIR="$SKILL_DIR/bin"
-SETUP_MARKER="$SKILL_DIR/.setup-complete"
+MONOREPO_ROOT="$(cd "$SKILL_DIR/../.." && pwd)"
+TOOLS_DIR="$MONOREPO_ROOT/tools/judge-the-code"
+VIEW_SRC_DIR="$MONOREPO_ROOT/tools/view"
+BIN_DIR="$TOOLS_DIR/bin"
+SETUP_MARKER="$TOOLS_DIR/.setup-complete"
+
 mkdir -p "$BIN_DIR"
 
 echo "🔧 judge-the-code setup"
 echo ""
-echo "  Working dir: $SKILL_DIR"
-echo "  Mode: in-place setup for the current judge-the-code directory"
+echo "  Skill dir:    $SKILL_DIR"
+echo "  Repo root:    $MONOREPO_ROOT"
+echo "  Shared tools: $TOOLS_DIR"
 echo ""
 
 if [ -f "$BIN_DIR/judge-the-code" ]; then
@@ -19,7 +23,6 @@ if [ -f "$BIN_DIR/judge-the-code" ]; then
   echo "  ✅ unified CLI ready → $BIN_DIR/judge-the-code"
 fi
 
-# ── view binary ──────────────────────────────────────────────────────────────
 if [ -x "$BIN_DIR/view" ]; then
   echo "  ✅ view already built"
 else
@@ -28,20 +31,22 @@ else
     echo "     Install Go from https://go.dev to enable the dashboard"
   else
     echo "  Building view..."
-    (cd "$SKILL_DIR/view" && go build -o "$BIN_DIR/view" .)
+    (cd "$VIEW_SRC_DIR" && go build -o "$BIN_DIR/view" .)
     echo "  ✅ view built → $BIN_DIR/view"
   fi
 fi
 
 echo ""
-echo "  Run: $BIN_DIR/judge-the-code <project-path>   # unified analysis entrypoint"
-echo "  Run: $BIN_DIR/view <project-path>             # open dashboard in browser"
-echo ""
+echo "  Setting up code-explore tools..."
+"$MONOREPO_ROOT/skills/code-explore/setup"
 
-# ── demon-hunter tools ───────────────────────────────────────────────────────
+echo ""
 echo "  Setting up demon-hunter tools..."
-"$SKILL_DIR/demon-hunter/setup"
+"$MONOREPO_ROOT/skills/demon-hunter/setup"
 
 date '+%Y-%m-%d %H:%M:%S %z' > "$SETUP_MARKER"
+
 echo ""
+echo "  Run: $BIN_DIR/judge-the-code <project-path>   # unified analysis entrypoint"
+echo "  Run: $BIN_DIR/view <project-path>             # open dashboard in browser"
 echo "  ✅ setup marker written → $SETUP_MARKER"

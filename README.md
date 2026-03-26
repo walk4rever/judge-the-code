@@ -99,19 +99,36 @@ As the AI Agent ecosystem grows, more and more projects are not traditional sour
 
 ---
 
+## Monorepo Layout
+
+This repository is a **skill monorepo**:
+
+```text
+skills/
+  judge-the-code/   # root router skill
+  code-explore/     # codebase understanding
+  design-lens/      # design philosophy review
+  demon-hunter/     # security and risk scanning
+  token-optimize/   # LLM/token cost review
+  skill-review/     # skill/prompt project review
+tools/
+  judge-the-code/   # shared CLI wrappers and dashboard binary
+  view/             # dashboard source code
+```
+
+Each directory under `skills/` is an independent skill. Shared runtime tooling lives under `tools/`, not inside a single skill.
+
 ## Installation
 
-Place the `judge-the-code` directory wherever your agent loads skills from, then run setup inside that directory.
+Clone the repo, then run setup from the monorepo root:
 
 ```bash
-cd /path/to/judge-the-code
+git clone <repo-url>
+cd judge-the-code
 ./setup
 ```
 
-`setup` is in-place: it prepares tools for the current `judge-the-code` directory only.
-It does not copy files into any global skills path for you.
-
-> Upgrading: replace this directory with the new version, then run `./setup` again.
+`setup` prepares shared CLI tooling under `tools/judge-the-code/` and installs any per-skill helper binaries in place.
 
 ## Usage
 
@@ -150,7 +167,7 @@ Use sub-skills directly only when you want one focused slice:
 ### Deterministic CLI Entrypoint
 
 ```bash
-./bin/judge-the-code .
+./tools/judge-the-code/bin/judge-the-code .
 ```
 
 `judge-the-code` is the non-chat unified entrypoint for mixed repositories:
@@ -164,7 +181,7 @@ Use sub-skills directly only when you want one focused slice:
 ### Dashboard
 
 ```bash
-./bin/view .
+./tools/judge-the-code/bin/view .
 ```
 
 Generates `.judge-the-code/summary.html` and opens it in your browser.

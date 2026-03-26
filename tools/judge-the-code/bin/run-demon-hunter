@@ -9,8 +9,9 @@ set -euo pipefail
 
 TARGET="${1:-.}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SUITE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEMON_DIR="$SUITE_DIR/demon-hunter"
+TOOLS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MONOREPO_ROOT="$(cd "$TOOLS_DIR/../.." && pwd)"
+DEMON_DIR="$MONOREPO_ROOT/skills/demon-hunter"
 FIND_TOOLS="$DEMON_DIR/bin/find-tools"
 
 if [ ! -d "$TARGET" ]; then

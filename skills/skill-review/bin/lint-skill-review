@@ -23,7 +23,7 @@ trap 'rm -f "$TMP"' EXIT
 SKILL_FILES=()
 while IFS= read -r file; do
   SKILL_FILES+=("$file")
-done < <(find "$TARGET" -maxdepth 6 -type f \( -name "SKILL.md" -o -path "*/agents/*.md" \) | sort)
+done < <(find "$TARGET" -maxdepth 6 -type f \( -name "SKILL.md" -o -path "*/agents/*.md" -o -path "*/references/agent-specs/*.md" \) | sort)
 if [ "${#SKILL_FILES[@]}" -eq 0 ]; then
   mkdir -p "$(dirname "$OUT")"
   printf '{\n  "target": "%s",\n  "generated_at": "%s",\n  "findings": []\n}\n' \

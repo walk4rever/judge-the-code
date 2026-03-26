@@ -108,14 +108,14 @@ origin: judge-the-code
 **同时启动以下 4 个 Explore 子 Agent，全部并行执行：**
 
 每个 Agent 的启动格式：
-> 读取 `{SKILL_DIR}/agents/agentN-xxx.md`，按其中的说明执行分析，完成后返回结果。
+> 读取 `{SKILL_DIR}/references/agent-specs/agentN-xxx.md`，按其中的说明执行分析，完成后返回结果。
 
 | Agent | 规格文件 | 分析维度 |
 |-------|---------|---------|
-| Agent 1 | `{SKILL_DIR}/agents/agent1-naming-abstraction.md` | 命名风格、抽象层级、函数规模 |
-| Agent 2 | `{SKILL_DIR}/agents/agent2-error-handling.md` | 错误处理风格、边界保护、信息质量 |
-| Agent 3 | `{SKILL_DIR}/agents/agent3-testing-quality.md` | 测试类型分布、命名风格、mock 策略 |
-| Agent 4 | `{SKILL_DIR}/agents/agent4-architecture-decisions.md` | 技术选型、工程规范、非常规决策 |
+| Agent 1 | `{SKILL_DIR}/references/agent-specs/agent1-naming-abstraction.md` | 命名风格、抽象层级、函数规模 |
+| Agent 2 | `{SKILL_DIR}/references/agent-specs/agent2-error-handling.md` | 错误处理风格、边界保护、信息质量 |
+| Agent 3 | `{SKILL_DIR}/references/agent-specs/agent3-testing-quality.md` | 测试类型分布、命名风格、mock 策略 |
+| Agent 4 | `{SKILL_DIR}/references/agent-specs/agent4-architecture-decisions.md` | 技术选型、工程规范、非常规决策 |
 
 ---
 
@@ -230,7 +230,12 @@ origin: judge-the-code
 
 保存到`.judge-the-code/design-lens.md`。
 
-**保存完成后，你必须使用 bash 执行 `{SKILL_DIR}/bin/view .` 生成并打开 dashboard。**
+**保存完成后，你必须使用 bash 执行 monorepo 共享 dashboard：**
+
+```bash
+MONOREPO_ROOT="$(cd "{SKILL_DIR}/../.." && pwd)"
+"$MONOREPO_ROOT/tools/judge-the-code/bin/view" .
+```
 
 **执行完成后，输出：**
 ```

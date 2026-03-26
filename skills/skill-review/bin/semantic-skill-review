@@ -35,7 +35,11 @@ out = Path(sys.argv[2])
 
 files = []
 for p in target.rglob("*"):
-    if p.is_file() and (p.name == "SKILL.md" or "agents" in p.parts and p.suffix == ".md"):
+    if p.is_file() and (
+        p.name == "SKILL.md" or
+        ("agents" in p.parts and p.suffix == ".md") or
+        ("references" in p.parts and "agent-specs" in p.parts and p.suffix == ".md")
+    ):
         files.append(p)
 files.sort()
 

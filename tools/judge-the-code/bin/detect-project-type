@@ -71,7 +71,10 @@ def walk_dir(p: Path, depth: int = 0):
             root = e.parent.resolve()
             skill_roots.add(str(root))
             skill_signals.append(str(e))
-        elif "agents" in e.parts and e.suffix == ".md":
+        elif e.suffix == ".md" and (
+            "agents" in e.parts or
+            ("references" in e.parts and "agent-specs" in e.parts)
+        ):
             skill_signals.append(str(e))
 
 walk_dir(target)

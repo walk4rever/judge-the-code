@@ -89,14 +89,15 @@ demon-hunter 需要在以下所有环境下可用：
 参考 gstack 的 `browse/dist/browse` 模式——skill 目录内自带二进制。
 
 ```
-~/.agents/skills/judge-the-code/
-└── demon-hunter/
-    ├── SKILL.md
-    ├── setup              ← 一次性安装脚本（类似 gstack/setup）
-    └── bin/               ← skill 自管理的工具目录，不写入系统 PATH
-        ├── trivy          ← Go 单二进制，直接从 GitHub Releases 下载
-        ├── gitleaks       ← Go 单二进制，直接从 GitHub Releases 下载
-        └── semgrep        ← 见下方说明
+judge-the-code/
+└── skills/
+    └── demon-hunter/
+        ├── SKILL.md
+        ├── setup              ← 一次性安装脚本（类似 gstack/setup）
+        └── bin/               ← skill 自管理的工具目录，不写入系统 PATH
+            ├── trivy          ← Go 单二进制，直接从 GitHub Releases 下载
+            ├── gitleaks       ← Go 单二进制，直接从 GitHub Releases 下载
+            └── semgrep        ← 见下方说明
 ```
 
 ### 各工具的隔离方式

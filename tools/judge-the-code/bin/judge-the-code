@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TOOLS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MONOREPO_ROOT="$(cd "$TOOLS_DIR/../.." && pwd)"
+SETUP_MARKER="$TOOLS_DIR/.setup-complete"
+
+if [ ! -f "$SETUP_MARKER" ]; then
+  echo "❌ judge-the-code is not set up for this monorepo yet." >&2
+  echo "   Run setup first:" >&2
+  echo "   cd $MONOREPO_ROOT && ./setup" >&2
+  exit 1
+fi
+
+exec "$SCRIPT_DIR/run-judge" "$@"

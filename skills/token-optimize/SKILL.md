@@ -146,17 +146,20 @@ glob 设为 `**/*`，path 设为 `{TARGET}`，排除 `node_modules`。
 
 保存到`.judge-the-code/token-optimize.md`。
 
-**保存完成后，使用 bash 检查并执行 dashboard：**
+**保存完成后，使用 bash 检查并执行 monorepo 共享 dashboard：**
 
 ```bash
-if [ -x "{SKILL_DIR}/bin/view" ]; then
-  "{SKILL_DIR}/bin/view" .
+MONOREPO_ROOT="$(cd "{SKILL_DIR}/../.." && pwd)"
+VIEW_BIN="$MONOREPO_ROOT/tools/judge-the-code/bin/view"
+
+if [ -x "$VIEW_BIN" ]; then
+  "$VIEW_BIN" .
 else
   echo "SKIP_VIEW"
 fi
 ```
 
-- 输出 `SKIP_VIEW`：跳过 dashboard，提示用户"如需可视化报告，请先运行 `/demon-hunter` 安装 view 工具"。
+- 输出 `SKIP_VIEW`：跳过 dashboard，提示用户"如需可视化报告，请先在 monorepo 根目录执行 `./setup`"。
 - 否则：dashboard 已生成并在浏览器打开。
 
 **执行完成后，输出：**

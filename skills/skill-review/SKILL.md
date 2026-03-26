@@ -46,13 +46,13 @@ fi
 
 重点识别以下文件：
 - `SKILL.md`
-- `agents/*.md`
+- `references/agent-specs/*.md`（兼容旧 `agents/*.md`）
 - `setup`
 - `bin/*`
 
 ```bash
 find "$TARGET" -maxdepth 4 -type f \
-  \( -name "SKILL.md" -o -path "*/agents/*.md" -o -name "setup" -o -path "*/bin/*" \) \
+  \( -name "SKILL.md" -o -path "*/agents/*.md" -o -path "*/references/agent-specs/*.md" -o -name "setup" -o -path "*/bin/*" \) \
   | head -200
 ```
 
@@ -87,10 +87,10 @@ fi
 
 | Agent | 规格文件 | 维度 |
 |------|---------|------|
-| Agent 1 | `agents/agent1-clarity.md` | Prompt 清晰度 |
-| Agent 2 | `agents/agent2-flow.md` | 执行流设计 |
-| Agent 3 | `agents/agent3-safety.md` | 安全边界与注入风险 |
-| Agent 4 | `agents/agent4-orchestration.md` | 编排/容错/兼容性 |
+| Agent 1 | `references/agent-specs/agent1-clarity.md` | Prompt 清晰度 |
+| Agent 2 | `references/agent-specs/agent2-flow.md` | 执行流设计 |
+| Agent 3 | `references/agent-specs/agent3-safety.md` | 安全边界与注入风险 |
+| Agent 4 | `references/agent-specs/agent4-orchestration.md` | 编排/容错/兼容性 |
 
 ### Phase 4：综合输出
 
@@ -158,10 +158,11 @@ if [ -x "{SKILL_DIR}/bin/update-skill-review-history" ]; then
 fi
 ```
 
-若存在 `bin/view`，执行：
+若存在 monorepo 共享 dashboard，执行：
 
 ```bash
-"{SKILL_DIR}/bin/view" .
+MONOREPO_ROOT="$(cd "{SKILL_DIR}/../.." && pwd)"
+"$MONOREPO_ROOT/tools/judge-the-code/bin/view" .
 ```
 
 ## 质量标准

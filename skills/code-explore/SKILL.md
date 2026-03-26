@@ -213,15 +213,15 @@ echo "scc: $SCC  syft: $SYFT"
 **同时启动以下 5 个 Explore 子 Agent，全部并行执行：**
 
 每个 Agent 的启动格式：
-> 读取 `{SKILL_DIR}/agents/agentN-xxx.md`，按其中的说明执行分析，完成后返回结果。
+> 读取 `{SKILL_DIR}/references/agent-specs/agentN-xxx.md`，按其中的说明执行分析，完成后返回结果。
 
 | Agent | 规格文件 | 分析维度 |
 |-------|---------|---------|
-| Agent 1 | `{SKILL_DIR}/agents/agent1-stack-detector.md` | 语言、框架、运行时 |
-| Agent 2 | `{SKILL_DIR}/agents/agent2-architecture-mapper.md` | 目录结构、架构模式、Mermaid 图 |
-| Agent 3 | `{SKILL_DIR}/agents/agent3-entry-point-tracer.md` | 启动入口、请求时序图 |
-| Agent 4 | `{SKILL_DIR}/agents/agent4-dependency-analyst.md` | 依赖分类、技术选型解读 |
-| Agent 5 | `{SKILL_DIR}/agents/agent5-dev-setup-guide.md` | 本地运行、硬件要求、环境变量 |
+| Agent 1 | `{SKILL_DIR}/references/agent-specs/agent1-stack-detector.md` | 语言、框架、运行时 |
+| Agent 2 | `{SKILL_DIR}/references/agent-specs/agent2-architecture-mapper.md` | 目录结构、架构模式、Mermaid 图 |
+| Agent 3 | `{SKILL_DIR}/references/agent-specs/agent3-entry-point-tracer.md` | 启动入口、请求时序图 |
+| Agent 4 | `{SKILL_DIR}/references/agent-specs/agent4-dependency-analyst.md` | 依赖分类、技术选型解读 |
+| Agent 5 | `{SKILL_DIR}/references/agent-specs/agent5-dev-setup-guide.md` | 本地运行、硬件要求、环境变量 |
 
 ---
 
@@ -289,17 +289,20 @@ A: [基于架构给出步骤]
 
 保存文件到`.judge-the-code/code-explore.md`。
 
-**保存完成后，使用 bash 检查并执行 dashboard：**
+**保存完成后，使用 bash 检查并执行 monorepo 共享 dashboard：**
 
 ```bash
-if [ -x "{SKILL_DIR}/bin/view" ]; then
-  "{SKILL_DIR}/bin/view" .
+MONOREPO_ROOT="$(cd "{SKILL_DIR}/../.." && pwd)"
+VIEW_BIN="$MONOREPO_ROOT/tools/judge-the-code/bin/view"
+
+if [ -x "$VIEW_BIN" ]; then
+  "$VIEW_BIN" .
 else
   echo "SKIP_VIEW"
 fi
 ```
 
-- 输出 `SKIP_VIEW`：跳过 dashboard，提示用户"如需可视化报告，请先运行 `/demon-hunter` 安装 view 工具"。
+- 输出 `SKIP_VIEW`：跳过 dashboard，提示用户"如需可视化报告，请先在 monorepo 根目录执行 `./setup`"。
 - 否则：dashboard 已生成并在浏览器打开。
 
 **执行完成后，输出：**

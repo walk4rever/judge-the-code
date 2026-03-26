@@ -11,9 +11,9 @@ set -euo pipefail
 TARGET="${1:-.}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_REVIEW_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SUITE_DIR="$(cd "$SKILL_REVIEW_DIR/.." && pwd)"
-VIEW_SRC_DIR="$SUITE_DIR/view"
-VIEW_BIN="$SUITE_DIR/bin/view"
+MONOREPO_ROOT="$(cd "$SKILL_REVIEW_DIR/../.." && pwd)"
+VIEW_SRC_DIR="$MONOREPO_ROOT/tools/view"
+VIEW_BIN="$MONOREPO_ROOT/tools/judge-the-code/bin/view"
 
 OUT_DIR="$TARGET/.judge-the-code"
 FINDINGS="$OUT_DIR/skill-review-findings.json"

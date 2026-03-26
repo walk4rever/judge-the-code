@@ -81,9 +81,54 @@ ext_map = {
     ".c": "C",
 }
 llm_pattern = re.compile(
-    r"(messages\.create|chat\.completions|openai|anthropic|langchain|llamaindex|api\.openai\.com|api\.anthropic\.com)",
+    r"("
+    r"messages\.create|chat\.completions|responses\.(create|stream)|"
+    r"completions\.create|embeddings\.create|images\.generate|"
+    r"api\.openai\.com|api\.anthropic\.com|api\.mistral\.ai|generativelanguage\.googleapis\.com|"
+    r"anthropic\.Anthropic|openai\.(OpenAI|AsyncOpenAI)|"
+    r"from\s+openai\s+import|import\s+openai|from\s+anthropic\s+import|import\s+anthropic|"
+    r"langchain|llamaindex|PromptTemplate|SystemMessage"
+    r")",
     re.IGNORECASE,
 )
+dataset_only_pattern = re.compile(
+    r"(load_dataset\s*\(|huggingface\.co/datasets/|openai/[\w.-]+|openai-community/[\w.-]+)",
+    re.IGNORECASE,
+)
+doc_only_pattern = re.compile(
+    r"(github\.com/openai/|github\.com/anthropic/|openai\s+gpt-?\d|codex\s+paper|tiktoken|humaneval)",
+    re.IGNORECASE,
+)
+
+def is_comment_or_doc_line(ext: str, line: str) -> bool:
+    stripped = line.strip()
+    if ext == ".py":
+        return stripped.startswith("#")
+    if ext in {".js", ".jsx", ".ts", ".tsx", ".java", ".kt", ".go", ".rs", ".c", ".cpp", ".cs", ".php"}:
+        return stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*")
+    if ext in {".md", ".rst", ".txt"}:
+        return True
+    return False
+
+def is_real_llm_hit(path: Path, ext: str, line: str) -> bool:
+    if not llm_pattern.search(line):
+        return False
+
+    if is_comment_or_doc_line(ext, line):
+        return False
+
+    lowered = line.lower()
+    if dataset_only_pattern.search(line):
+        return False
+    if doc_only_pattern.search(line):
+        return False
+
+    # Filter typical model/dataset/path references that mention vendor names
+    # without making an API call.
+    if "hf-path" in lowered or "from_pretrained" in lowered or "get_encoding(" in lowered:
+        return False
+
+    return True
 
 lang_counter = Counter()
 top_dirs = Counter()
@@ -105,7 +150,7 @@ for root, dirs, files in os.walk(target):
             if ext in {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rs", ".rb", ".php", ".md"}:
                 txt = p.read_text(encoding="utf-8", errors="ignore")
                 for i, line in enumerate(txt.splitlines(), start=1):
-                    if llm_pattern.search(line):
+                    if is_real_llm_hit(p, ext, line):
                         llm_hits.append((str(p.relative_to(target)), i, line.strip()[:180]))
                         if len(llm_hits) >= 30:
                             break
@@ -138,7 +183,7 @@ if write_explore:
     lines.append("## TL;DR")
     lines.append(f"- 项目类型: {ptype}")
     lines.append(f"- 主要语言: {', '.join(top_langs)}")
-    lines.append("- 说明: 这是自动化基线报告；如需深度洞察，请运行完整 code-explore skill。")
+    lines.append("- 说明: 这是自动化基线报告；用于快速建立全局认知，详细结论请结合其余已生成报告一起阅读。")
     lines.append("")
     lines.append("## 技术栈一览")
     lines.append("| 维度 | 结果 |")
@@ -153,10 +198,10 @@ if write_explore:
     for d, c in top_dirs_rows:
         lines.append(f"| `{d}` | {c} |")
     lines.append("")
-    lines.append("## 后续建议")
-    lines.append("1. 运行 code-explore 获取完整架构图与入口流程。")
-    lines.append("2. 运行 design-lens 提取设计决策与可学习模式。")
-    lines.append("3. 运行 demon-hunter 做安全与依赖风险审查。")
+    lines.append("## 阅读建议")
+    lines.append("1. 先阅读本报告，快速确认项目类型、目录热点和关键清单文件。")
+    lines.append("2. 再查看 `design-lens.md`，理解设计决策、抽象层级和工程取向。")
+    lines.append("3. 最后查看 `demon-hunter.md`，优先处理安全与依赖风险。")
     explore_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 if write_design:
@@ -168,7 +213,7 @@ if write_design:
     lines.append("## 代码风格画像")
     lines.append(f"- 主语言分布: {', '.join(top_langs)}")
     lines.append(f"- 目录组织倾向: {', '.join([d for d,_ in top_dirs_rows[:5]])}")
-    lines.append("- 判断说明: 该报告为静态结构基线，不替代完整 design-lens 语义分析。")
+    lines.append("- 判断说明: 该报告为静态结构基线，用于给后续设计判断提供上下文。")
     lines.append("")
     lines.append("## 值得关注的决策点")
     lines.append("- 是否存在单体脚本/大文件集中逻辑。")
@@ -176,9 +221,9 @@ if write_design:
     lines.append("- 测试目录与业务目录是否成体系。")
     lines.append("")
     lines.append("## 建议")
-    lines.append("1. 对核心目录进行命名一致性和抽象层级审查。")
-    lines.append("2. 对错误处理策略做统一（返回码/异常传播/日志策略）。")
-    lines.append("3. 运行 design-lens 获取决策级语义评价。")
+    lines.append("1. 结合 `code-explore.md` 复核核心目录的命名一致性和抽象层级。")
+    lines.append("2. 重点检查错误处理策略是否统一（返回码、异常传播、日志策略）。")
+    lines.append("3. 若需要更深入的交互式设计讨论，再单独运行 `/design-lens`。")
     design_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 if write_demon:
@@ -202,9 +247,9 @@ if write_demon:
     lines.append("")
     lines.append("## 结论")
     if security_hits:
-        lines.append("- 检测到潜在风险线索，建议运行完整 demon-hunter（SAST/CVE/secret）。")
+        lines.append("- 检测到潜在风险线索；请优先结合完整 `demon-hunter.md` 处置高风险项。")
     else:
-        lines.append("- 未发现明显高风险关键词，建议仍执行完整安全审查。")
+        lines.append("- 未发现明显高风险关键词；仍建议结合完整 `demon-hunter.md` 复核扫描结果。")
     demon_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 if write_opt:
@@ -227,9 +272,9 @@ if write_opt:
     lines.append("")
     lines.append("## 结论")
     if llm_hits:
-        lines.append("- 建议对上述调用点执行完整 token-optimize skill 深度分析。")
+        lines.append("- 已识别到潜在 LLM 触点；请结合 `token-optimize.md` 继续收敛高成本与高风险场景。")
     else:
-        lines.append("- 未发现明显 LLM 调用关键词，当前 token 风险较低。")
+        lines.append("- 未发现明显 LLM 调用关键词，当前 token 风险相对较低。")
     opt_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 print(f"WROTE_EXPLORE={write_explore}")

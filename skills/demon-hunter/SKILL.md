@@ -182,9 +182,9 @@ $GITLEAKS detect \
 
 | Agent | 规格文件 | 分析维度 |
 |-------|---------|---------|
-| Agent 1 | `{SKILL_DIR}/agents/agent1-sast-interpreter.md` | bearer 结果解读，去误报，补上下文 |
-| Agent 2 | `{SKILL_DIR}/agents/agent2-secrets-sca-interpreter.md` | trivy + gitleaks 结果解读，区分真实泄漏 |
-| Agent 3 | `{SKILL_DIR}/agents/agent3-design-analyst.md` | 性能隐患、隐性耦合、陷阱 API（纯 Claude）|
+| Agent 1 | `{SKILL_DIR}/references/agent-specs/agent1-sast-interpreter.md` | bearer 结果解读，去误报，补上下文 |
+| Agent 2 | `{SKILL_DIR}/references/agent-specs/agent2-secrets-sca-interpreter.md` | trivy + gitleaks 结果解读，区分真实泄漏 |
+| Agent 3 | `{SKILL_DIR}/references/agent-specs/agent3-design-analyst.md` | 性能隐患、隐性耦合、陷阱 API（纯 Claude）|
 
 ---
 
@@ -253,7 +253,12 @@ $GITLEAKS detect \
 
 保存到`.judge-the-code/demon-hunter.md`。
 
-**保存完成后，你必须使用 bash 执行 `{SKILL_DIR}/bin/view .` 生成并打开 dashboard。**
+**保存完成后，你必须使用 bash 执行 monorepo 共享 dashboard：**
+
+```bash
+MONOREPO_ROOT="$(cd "{SKILL_DIR}/../.." && pwd)"
+"$MONOREPO_ROOT/tools/judge-the-code/bin/view" .
+```
 
 **执行完成后，输出：**
 ```

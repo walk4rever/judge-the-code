@@ -98,21 +98,39 @@ code-explore  →  design-lens  →  demon-hunter  →  token-optimize
 
 ---
 
+## Monorepo 结构
+
+这个仓库现在是一个 **skill monorepo**：
+
+```text
+skills/
+  judge-the-code/   # 总入口 skill
+  code-explore/     # 代码库理解
+  design-lens/      # 设计哲学审查
+  demon-hunter/     # 安全与风险扫描
+  token-optimize/   # LLM / Token 成本审查
+  skill-review/     # Skill / Prompt 项目审查
+tools/
+  judge-the-code/   # 共享 CLI 和 dashboard 二进制
+  view/             # dashboard 源码
+```
+
+`skills/` 下每个目录都是独立 skill；共享运行时工具统一放在 `tools/`，不再挂在某一个 skill 目录下面。
+
 ## 安装
 
-先把 `judge-the-code` 目录放到你自己的 agent skills 加载路径里，然后在这个目录内部执行 setup。
+从 monorepo 根目录执行 setup：
 
 ```bash
-cd /path/to/judge-the-code
+git clone <repo-url>
+cd judge-the-code
 ./setup
 ```
 
-`setup` 是原地初始化：
+`setup` 会：
 
-- 只为当前这份 `judge-the-code` 目录准备工具
-- 不会帮你复制到任何全局 skills 路径
-
-> 升级提示：用新版本替换当前目录后，重新执行 `./setup`。
+- 在 `tools/judge-the-code/` 下准备统一 CLI
+- 在各 skill 目录原地安装所需辅助工具
 
 ## 使用方式
 
@@ -151,7 +169,7 @@ cd /path/to/judge-the-code
 ### 非对话 CLI 入口
 
 ```bash
-./bin/judge-the-code .
+./tools/judge-the-code/bin/judge-the-code .
 ```
 
 `judge-the-code` 是面向混合仓库的非对话统一入口：
@@ -165,7 +183,7 @@ cd /path/to/judge-the-code
 ### Dashboard
 
 ```bash
-./bin/view .
+./tools/judge-the-code/bin/view .
 ```
 
 自动生成 `.judge-the-code/summary.html` 并在浏览器打开。

@@ -32,10 +32,10 @@ origin: judge-the-code
 
 如果用户没有给路径，默认按当前目录处理。
 
-在执行任何分析前，先检查当前这份 skill 目录是否完成 setup。
+在执行任何分析前，先检查当前 monorepo 是否完成 setup。
 
 - 若未完成 setup：立即停止，不进入后续分析
-- 明确提示用户先在当前 `judge-the-code` 目录执行 `./setup`
+- 明确提示用户先在 monorepo 根目录执行 `./setup`
 - 不要让用户先看到“missing executable”这类底层报错
 
 ### 自然语言触发

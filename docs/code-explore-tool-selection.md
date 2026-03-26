@@ -52,7 +52,7 @@
 复用 `demon-hunter/setup` 的成熟模式：
 - 探测 OS/arch（macOS/Linux, arm64/amd64）
 - 从 GitHub Releases 下载 `syft` + `scc` 的静态二进制
-- 存入 `skills/judge-the-code/code-explore/bin/`
+- 存入 `skills/code-explore/bin/`
 
 ### Phase 2: Agent 改造
 **Agent 2 (架构分析) 改造：**
