@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
-# judge-the-code setup — build the view binary
-# Run once after installing the skill.
+# judge-the-code setup — initialize the current skill directory in place
+# Run this script from whatever location you store this skill in.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$SKILL_DIR/bin"
+SETUP_MARKER="$SKILL_DIR/.setup-complete"
 mkdir -p "$BIN_DIR"
 
 echo "🔧 judge-the-code setup"
 echo ""
+echo "  Working dir: $SKILL_DIR"
+echo "  Mode: in-place setup for the current judge-the-code directory"
+echo ""
+
+if [ -f "$BIN_DIR/judge-the-code" ]; then
+  chmod +x "$BIN_DIR/judge-the-code"
+  echo "  ✅ unified CLI ready → $BIN_DIR/judge-the-code"
+fi
 
 # ── view binary ──────────────────────────────────────────────────────────────
 if [ -x "$BIN_DIR/view" ]; then
@@ -25,9 +34,14 @@ else
 fi
 
 echo ""
-echo "  Run: view <project-path>   # open dashboard in browser"
+echo "  Run: $BIN_DIR/judge-the-code <project-path>   # unified analysis entrypoint"
+echo "  Run: $BIN_DIR/view <project-path>             # open dashboard in browser"
 echo ""
 
 # ── demon-hunter tools ───────────────────────────────────────────────────────
 echo "  Setting up demon-hunter tools..."
 "$SKILL_DIR/demon-hunter/setup"
+
+date '+%Y-%m-%d %H:%M:%S %z' > "$SETUP_MARKER"
+echo ""
+echo "  ✅ setup marker written → $SETUP_MARKER"

@@ -31,7 +31,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-target = sys.argv[1]
+target = Path(sys.argv[1]).resolve()
 findings_path = Path(sys.argv[2])
 out_path = Path(sys.argv[3])
 semantic_path = Path(sys.argv[4])
@@ -128,6 +128,18 @@ def line_of(f):
 for s in sev_order:
     grouped[s].sort(key=lambda x: (str(x.get("file", "")), line_of(x)))
 
+def display_path(path_value):
+    raw = str(path_value or "")
+    if not raw:
+        return "-"
+    try:
+        p = Path(raw)
+        if not p.is_absolute():
+            return raw
+        return str(p.resolve().relative_to(target))
+    except Exception:
+        return raw
+
 summary = []
 if not all_findings:
     summary = ["未发现规则或语义层问题。", "当前实现可直接使用，建议保持迭代验证。"]
@@ -146,7 +158,7 @@ for s in sev_order:
         if sug not in fixes:
             fixes.append(sug)
 
-project = os.path.basename(os.path.abspath(target)) or target
+project = target.name or str(target)
 now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
 lines = []
@@ -173,7 +185,7 @@ for s in sev_order:
         lines.append("- 无")
         continue
     for f in grouped[s]:
-        file = f.get("file", "")
+        file = display_path(f.get("file", ""))
         line = line_of(f)
         msg = str(f.get("message", "")).strip()
         sug = str(f.get("suggestion", "")).strip()
@@ -204,7 +216,7 @@ else:
             continue
         lines.append(f"### {d}")
         for f in arr:
-            file = f.get("file", "")
+            file = display_path(f.get("file", ""))
             line = line_of(f)
             msg = str(f.get("message", "")).strip()
             sug = str(f.get("suggestion", "")).strip()

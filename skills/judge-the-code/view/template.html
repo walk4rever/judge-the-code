@@ -255,11 +255,11 @@ const reviewHistory = <!--CONTENT_REVIEW_HISTORY-->;
 const TAB_IDS = ['explore', 'lens', 'hunter', 'optimize', 'review'];
 
 const EMPTY_MSGS = {
-  explore:  { cmd: '/code-explore .', msg: '尚未运行 code-explore' },
-  lens:     { cmd: '/design-lens .', msg: '尚未运行 design-lens' },
-  hunter:   { cmd: '/demon-hunter .', msg: '尚未运行 demon-hunter' },
-  optimize: { cmd: '/token-optimize .', msg: '尚未运行 token-optimize' },
-  review:   { cmd: '/skill-review .', msg: '尚未运行 skill-review' },
+  explore:  { cmd: '/judge-the-code .', msg: '尚未运行 judge-the-code（结构分析未生成）' },
+  lens:     { cmd: '/judge-the-code .', msg: '尚未运行 judge-the-code（设计分析未生成）' },
+  hunter:   { cmd: '/judge-the-code .', msg: '尚未运行 judge-the-code（风险分析未生成）' },
+  optimize: { cmd: '/judge-the-code .', msg: '尚未运行 judge-the-code（Token 诊断未生成）' },
+  review:   { cmd: '/judge-the-code .', msg: '尚未运行 judge-the-code（Skill 审查未生成）' },
 };
 
 // ── markdown-it setup ──

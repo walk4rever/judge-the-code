@@ -98,48 +98,77 @@ code-explore  →  design-lens  →  demon-hunter  →  token-optimize
 
 ---
 
-## 使用方式
-
-```bash
-/code-explore .       # 第一步：理解项目结构
-/design-lens .        # 第二步：提炼设计哲学
-/demon-hunter .       # 第三步：猎杀恶魔
-/token-optimize .     # 第四步：找到 Token 浪费
-/skill-review .       # Skill/Prompt 路径：审查 Prompt 工程项目
-
-view .                # 在浏览器查看 dashboard
-
-# 一键跑完 deterministic skill-review（报告 + 历史 + dashboard）
-~/.agents/skills/judge-the-code/skill-review/bin/run-skill-review .
-
-# 混合项目统一入口（自动识别 code/skill/hybrid）
-~/.agents/skills/judge-the-code/bin/run-judge .
-# - hybrid/skill: 自动执行 skill-review
-# - hybrid/code: 默认 full baseline（code-explore/design-lens/demon-hunter/token-optimize）
-# - 全部产物统一落在 TARGET/.judge-the-code/
-```
-
----
-
 ## 安装
 
-```bash
-# 1. 复制 skill
-cp -r skills/judge-the-code ~/.agents/skills/
-
-# 2. 一次性 setup（构建 dashboard + 下载扫描工具）
-~/.agents/skills/judge-the-code/setup
-```
-
-> ⚠️ **升级提示**：每次更新后重新执行 cp 即可覆盖旧版本。
-
-## Dashboard
+先把 `judge-the-code` 目录放到你自己的 agent skills 加载路径里，然后在这个目录内部执行 setup。
 
 ```bash
-~/.agents/skills/judge-the-code/bin/view .
+cd /path/to/judge-the-code
+./setup
 ```
 
-自动生成 `.judge-the-code/dashboard.html` 并在浏览器打开，渲染 Mermaid 架构图、设计决策评级、安全漏洞报告。
+`setup` 是原地初始化：
+
+- 只为当前这份 `judge-the-code` 目录准备工具
+- 不会帮你复制到任何全局 skills 路径
+
+> 升级提示：用新版本替换当前目录后，重新执行 `./setup`。
+
+## 使用方式
+
+默认只需要记一个入口：
+
+```bash
+/judge-the-code .
+/judge-the-code /path/to/project
+```
+
+根 skill 会自动分流：
+
+- 代码仓库：`code-explore -> design-lens -> demon-hunter -> token-optimize`
+- Skill/Prompt 项目：`skill-review`
+- Hybrid 项目：自动识别并选择合适路径
+
+自然语言也应该落到同一个总入口，例如：
+
+- “帮我完整审查这个仓库”
+- “帮我理解这个代码库并找风险”
+- “审查一下这份 AI 生成的项目”
+- “看看这个 Skill 项目有没有 Prompt 和编排问题”
+
+### 高级用法
+
+只有在你明确只想跑某个维度时，才直接调用子 skill：
+
+```bash
+/code-explore .       # 结构理解与上手
+/design-lens .        # 设计哲学
+/demon-hunter .       # 安全与隐患扫描
+/token-optimize .     # LLM / Token 成本审查
+/skill-review .       # Skill / Prompt 工程审查
+```
+
+### 非对话 CLI 入口
+
+```bash
+./bin/judge-the-code .
+```
+
+`judge-the-code` 是面向混合仓库的非对话统一入口：
+
+- hybrid/skill：自动执行 `skill-review`
+- hybrid/code：默认执行完整 baseline
+- 全部产物统一落在 `TARGET/.judge-the-code/`
+
+`run-judge` 作为底层实现脚本保留，用于兼容已有调用。
+
+### Dashboard
+
+```bash
+./bin/view .
+```
+
+自动生成 `.judge-the-code/summary.html` 并在浏览器打开。
 
 ### 输出文件
 
@@ -150,7 +179,7 @@ cp -r skills/judge-the-code ~/.agents/skills/
 ├── demon-hunter.md     ← demon-hunter 报告
 ├── token-optimize.md   ← token-optimize 报告
 ├── skill-review.md     ← skill-review 报告
-├── dashboard.html      ← 可视化 dashboard
+├── summary.html        ← 可视化总览
 └── state/              ← skill 内部状态（不用管）
 ```
 

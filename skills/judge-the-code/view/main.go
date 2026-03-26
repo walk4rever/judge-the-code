@@ -73,19 +73,21 @@ func main() {
 	// Inject generated time
 	html = strings.ReplaceAll(html, "<!--GENERATED_AT-->", time.Now().Format("2006-01-02 15:04"))
 
-	// Write dashboard
+	// Write summary HTML
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "error: cannot create %s: %v\n", dir, err)
 		os.Exit(1)
 	}
-	outPath := filepath.Join(dir, "dashboard.html")
+	outPath := filepath.Join(dir, "summary.html")
+	legacyPath := filepath.Join(dir, "dashboard.html")
 	if err := os.WriteFile(outPath, []byte(html), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error: cannot write dashboard: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: cannot write summary html: %v\n", err)
 		os.Exit(1)
 	}
+	_ = os.Remove(legacyPath)
 
 	absPath, _ := filepath.Abs(outPath)
-	fmt.Printf("📊 Dashboard → %s\n", absPath)
+	fmt.Printf("📊 Summary HTML → %s\n", absPath)
 	openBrowser(absPath)
 }
 

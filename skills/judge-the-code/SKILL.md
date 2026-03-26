@@ -2,10 +2,10 @@
 name: judge-the-code
 description: >-
   帮助人类在 AI 大量生成代码的时代，保持对代码的 Judgment 和 Taste。
-  包含四个渐进式 skill：code-explore（建立结构认知）、
-  design-lens（提炼设计哲学）、demon-hunter（发现安全漏洞与设计陷阱）、
-  token-optimize（发现 Token 浪费与隐患），以及 skill-review（审查 Skill/Prompt 工程质量）。
-  TRIGGER when: 用户想理解、评估、学习一个代码库，或想 review AI 生成的代码。
+  这是总入口 skill：自动在 code-explore、design-lens、demon-hunter、
+  token-optimize、skill-review 之间编排与分流。TRIGGER when:
+  用户想理解、评估、学习一个代码库，或想 review AI 生成的代码，
+  且没有明确指定只跑某个子 skill。
 origin: judge-the-code
 ---
 
@@ -13,9 +13,58 @@ origin: judge-the-code
 
 > AI 让代码能跑。但能跑不等于好。
 
-这个 skill 套件帮你保持对代码的判断力。
+这是 `judge-the-code` 的总入口。对最终用户，默认只需要记一个命令：
 
-## 四层工作流
+```bash
+/judge-the-code .
+/judge-the-code /path/to/project
+```
+
+根 skill 负责判断目标类型，并自动选择合适的分析链路。子 skill 继续保留，但属于内部执行单元和高级用法，不应成为默认 onboarding。
+
+## 入口职责
+
+### 默认入口
+
+```
+/judge-the-code <项目路径>
+```
+
+如果用户没有给路径，默认按当前目录处理。
+
+在执行任何分析前，先检查当前这份 skill 目录是否完成 setup。
+
+- 若未完成 setup：立即停止，不进入后续分析
+- 明确提示用户先在当前 `judge-the-code` 目录执行 `./setup`
+- 不要让用户先看到“missing executable”这类底层报错
+
+### 自然语言触发
+
+以下表达都应优先触发本根 skill，而不是要求用户手动记子命令：
+
+- 帮我完整审查这个仓库
+- 看看这个项目值不值得学
+- 分析这个 repo 的结构、设计和风险
+- review 一下这份 AI 生成的代码
+- 这个 Skill 项目有没有什么隐患
+
+### 分流规则
+
+收到 `/judge-the-code <path>` 后，先判断目标类型，再选择执行链路：
+
+1. **Skill / Prompt 工程项目**
+   - 特征：存在 `SKILL.md`、agent 定义、prompt 编排文件，且缺少传统应用入口
+   - 执行：`skill-review`
+
+2. **传统代码库**
+   - 执行：`code-explore → design-lens → demon-hunter → token-optimize`
+
+3. **Hybrid 项目**
+   - 同时包含代码与 Skill 编排
+   - 默认执行：传统代码库主链路
+   - 若用户明确要求审查 Prompt/Skill 质量，追加 `skill-review`
+
+## 代码库主链路
 
 ```
 code-explore  →  design-lens  →  demon-hunter  →  token-optimize
@@ -23,43 +72,18 @@ code-explore  →  design-lens  →  demon-hunter  →  token-optimize
      结构层                 欣赏层                   判断层                 经济层
 ```
 
-### 第一步：建立结构认知
+根 skill 应按以下顺序组织执行，而不是把选择权丢给用户：
 
-```
-/code-explore .
-/code-explore ~/projects/some-repo
-```
+- `code-explore`：建立结构认知
+- `design-lens`：提炼设计哲学
+- `demon-hunter`：发现安全与设计隐患
+- `token-optimize`：发现 Token 浪费与上下文污染
 
-5 个并行 Agent 分析技术栈、架构、入口、依赖、开发环境。
-输出 `.judge-the-code/code-explore.md` + 渐进式导览模式。
+各阶段输出统一落到 `.judge-the-code/`。
 
-### 第二步：提炼设计哲学
+## Skill / Prompt 路径
 
-```
-/design-lens .
-```
-
-4 个并行 Agent 分析命名风格、错误处理、测试取向、架构决策。
-输出 `.judge-the-code/design-lens.md`，每条决策打标签：🔮 精妙 / ✅ 合理 / ⚠️ 存疑 / ❌ 反模式。
-
-### 第三步：猎杀恶魔
-
-```
-/demon-hunter .
-```
-
-bearer（SAST）+ trivy（依赖 CVE + Secrets + IaC）+ gitleaks（Git history 密钥）+ Claude 语义分析。
-首次使用需运行 `{SKILL_DIR}/setup` 安装工具和 dashboard（约 150MB，存入 skill 目录，不影响系统）。
-
-### 第四步：Token 经济学诊断
-
-```
-/token-optimize .
-```
-
-纯静态分析代码中的大模型交互点，推演 Token 消耗爆炸隐患、长上下文导致的注意力污染，并给出具体的降本、提速、防幻觉建议。
-
-## Skill/Prompt 路径（MVP）
+若目标更像 Skill/Prompt 工程项目，则走：
 
 ```
 /skill-review .
@@ -67,6 +91,18 @@ bearer（SAST）+ trivy（依赖 CVE + Secrets + IaC）+ gitleaks（Git history 
 
 用于审查 Skill/Prompt 工程项目：Prompt 清晰度、执行流设计、Agent 编排、容错降级、安全边界与模型兼容性。
 输出 `.judge-the-code/skill-review.md`。
+
+## 高级用法
+
+只有在用户明确要求某个维度，或你确认只需要局部分析时，才直接使用子 skill：
+
+- `/code-explore .`
+- `/design-lens .`
+- `/demon-hunter .`
+- `/token-optimize .`
+- `/skill-review .`
+
+若用户只是泛泛地说“帮我看看这个项目”，默认仍应优先使用 `/judge-the-code .` 这个单入口。
 
 ---
 

@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# run-demon-hunter
+# Full demon-hunter scan for judge-the-code unified pipeline.
+#
+# Usage:
+#   run-demon-hunter <target-dir>
+
+TARGET="${1:-.}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SUITE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEMON_DIR="$SUITE_DIR/demon-hunter"
+FIND_TOOLS="$DEMON_DIR/bin/find-tools"
+
+if [ ! -d "$TARGET" ]; then
+  echo "error: target is not a directory: $TARGET" >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: python3 is required" >&2
+  exit 1
+fi
+
+if [ ! -x "$FIND_TOOLS" ]; then
+  echo "error: missing executable: $FIND_TOOLS" >&2
+  exit 1
+fi
+
+OUT_DIR="$TARGET/.judge-the-code"
+STATE_DIR="$OUT_DIR/state/demon-hunter"
+REPORT="$OUT_DIR/demon-hunter.md"
+mkdir -p "$STATE_DIR"
+
+TOOLS_ENV="$("$FIND_TOOLS")"
+eval "$TOOLS_ENV"
+
+if [ "${BEARER:-MISSING}" = "MISSING" ] && [ "${TRIVY:-MISSING}" = "MISSING" ] && [ "${GITLEAKS:-MISSING}" = "MISSING" ]; then
+  echo "error: no demon-hunter scanners available" >&2
+  echo "hint: run one-time setup: $DEMON_DIR/setup" >&2
+  exit 1
+fi
+
+echo "🔍 demon: running full scan"
+echo "  bearer:   ${BEARER:-MISSING}"
+echo "  trivy:    ${TRIVY:-MISSING}"
+echo "  gitleaks: ${GITLEAKS:-MISSING}"
+
+BEARER_JSON="$STATE_DIR/bearer.json"
+TRIVY_JSON="$STATE_DIR/trivy.json"
+GITLEAKS_JSON="$STATE_DIR/gitleaks.json"
+printf '{"critical":[],"high":[]}\n' > "$BEARER_JSON"
+printf '{"Results":[]}\n' > "$TRIVY_JSON"
+printf '[]\n' > "$GITLEAKS_JSON"
+
+run_bearer() {
+  if [ "${BEARER:-MISSING}" = "MISSING" ]; then
+    return 0
+  fi
+  if ! "$BEARER" scan "$TARGET" --format=json --severity=critical,high --quiet > "$BEARER_JSON" 2>/dev/null; then
+    printf '{"critical":[],"high":[]}\n' > "$BEARER_JSON"
+  fi
+}
+
+run_trivy() {
+  if [ "${TRIVY:-MISSING}" = "MISSING" ]; then
+    return 0
+  fi
+  if ! "$TRIVY" fs "$TARGET" --format=json --severity=CRITICAL,HIGH --scanners=vuln,secret,config --quiet > "$TRIVY_JSON" 2>/dev/null; then
+    printf '{"Results":[]}\n' > "$TRIVY_JSON"
+  fi
+}
+
+run_gitleaks() {
+  if [ "${GITLEAKS:-MISSING}" = "MISSING" ]; then
+    return 0
+  fi
+  if ! git -C "$TARGET" rev-parse HEAD >/dev/null 2>&1; then
+    printf '[]\n' > "$GITLEAKS_JSON"
+    return 0
+  fi
+  if ! "$GITLEAKS" detect --source="$TARGET" --report-format=json --report-path=- --no-banner > "$GITLEAKS_JSON" 2>/dev/null; then
+    printf '[]\n' > "$GITLEAKS_JSON"
+  fi
+}
+
+run_bearer &
+P1=$!
+run_trivy &
+P2=$!
+run_gitleaks &
+P3=$!
+wait "$P1" "$P2" "$P3"
+
+python3 - "$TARGET" "$REPORT" "$BEARER_JSON" "$TRIVY_JSON" "$GITLEAKS_JSON" "${BEARER:-MISSING}" "${TRIVY:-MISSING}" "${GITLEAKS:-MISSING}" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+target = Path(sys.argv[1]).resolve()
+report = Path(sys.argv[2])
+bearer_path = Path(sys.argv[3])
+trivy_path = Path(sys.argv[4])
+gitleaks_path = Path(sys.argv[5])
+bearer_bin = sys.argv[6]
+trivy_bin = sys.argv[7]
+gitleaks_bin = sys.argv[8]
+
+def read_json(path, fallback):
+    try:
+        return json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return fallback
+
+bearer = read_json(bearer_path, {"critical": [], "high": []})
+trivy = read_json(trivy_path, {"Results": []})
+gitleaks = read_json(gitleaks_path, [])
+if isinstance(gitleaks, dict):
+    gitleaks = gitleaks.get("leaks", [])
+if not isinstance(gitleaks, list):
+    gitleaks = []
+
+def to_list(v):
+    return v if isinstance(v, list) else []
+
+bearer_critical = to_list(bearer.get("critical"))
+bearer_high = to_list(bearer.get("high"))
+
+vulns = []
+secrets = []
+misconfigs = []
+for result in to_list(trivy.get("Results")):
+    for v in to_list(result.get("Vulnerabilities")):
+        sev = str(v.get("Severity", "")).upper()
+        if sev in {"CRITICAL", "HIGH"}:
+            vulns.append(v)
+    for s in to_list(result.get("Secrets")):
+        sev = str(s.get("Severity", "")).upper()
+        if sev in {"CRITICAL", "HIGH"}:
+            secrets.append(s)
+    for m in to_list(result.get("Misconfigurations")):
+        sev = str(m.get("Severity", "")).upper()
+        if sev in {"CRITICAL", "HIGH"}:
+            misconfigs.append(m)
+
+critical_count = len(bearer_critical) + sum(1 for v in vulns if str(v.get("Severity", "")).upper() == "CRITICAL") + sum(1 for s in secrets if str(s.get("Severity", "")).upper() == "CRITICAL") + sum(1 for m in misconfigs if str(m.get("Severity", "")).upper() == "CRITICAL") + len(gitleaks)
+high_count = len(bearer_high) + sum(1 for v in vulns if str(v.get("Severity", "")).upper() == "HIGH") + sum(1 for s in secrets if str(s.get("Severity", "")).upper() == "HIGH") + sum(1 for m in misconfigs if str(m.get("Severity", "")).upper() == "HIGH")
+
+skipped = []
+if bearer_bin == "MISSING":
+    skipped.append("bearer (SAST)")
+if trivy_bin == "MISSING":
+    skipped.append("trivy (CVE/Secrets/Config)")
+if gitleaks_bin == "MISSING":
+    skipped.append("gitleaks (git history secrets)")
+
+def row_loc(obj, *keys):
+    for key in keys:
+        val = obj.get(key)
+        if val:
+            return str(val)
+    return "-"
+
+lines = []
+lines.append(f"# {target.name} — Demon Hunter 报告")
+lines.append("")
+lines.append(f"> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')} | 工具: bearer + trivy + gitleaks")
+lines.append("")
+lines.append("## 风险总览")
+lines.append("")
+lines.append("| 级别 | 数量 | 类型 |")
+lines.append("|------|------|------|")
+lines.append(f"| 🔴 Critical | {critical_count} | SAST / CVE / Secrets / Config / GitLeaks |")
+lines.append(f"| 🟠 High | {high_count} | SAST / CVE / Secrets / Config |")
+lines.append(f"| 🟡 Medium | 0 | 本轮仅统计 critical/high |")
+lines.append("")
+lines.append(f"**跳过的扫描维度**: {'无' if not skipped else '，'.join(skipped)}")
+lines.append("")
+
+lines.append("## 🔴 代码安全漏洞（SAST / Bearer）")
+lines.append("")
+lines.append("| 位置 | 规则 | 严重级别 |")
+lines.append("|------|------|----------|")
+sast_rows = []
+for sev, arr in (("critical", bearer_critical), ("high", bearer_high)):
+    for item in arr[:20]:
+        loc = f"{row_loc(item, 'filename')}:{row_loc(item, 'line_number')}"
+        rid = row_loc(item, "id", "title")
+        sast_rows.append(f"| `{loc}` | `{rid}` | {sev.upper()} |")
+if sast_rows:
+    lines.extend(sast_rows)
+else:
+    lines.append("| 无 | - | - |")
+lines.append("")
+
+lines.append("## 🔑 密钥泄漏（Trivy + Gitleaks）")
+lines.append("")
+lines.append("| 位置 | 规则/类型 | 来源 |")
+lines.append("|------|-----------|------|")
+secret_rows = []
+for item in secrets[:20]:
+    target_file = row_loc(item, "Target", "File", "file")
+    rule = row_loc(item, "RuleID", "Title", "Category")
+    secret_rows.append(f"| `{target_file}` | `{rule}` | trivy |")
+for item in gitleaks[:20]:
+    target_file = row_loc(item, "File", "file")
+    rule = row_loc(item, "RuleID", "Description", "rule")
+    secret_rows.append(f"| `{target_file}` | `{rule}` | gitleaks |")
+if secret_rows:
+    lines.extend(secret_rows)
+else:
+    lines.append("| 无 | - | - |")
+lines.append("")
+
+lines.append("## 📦 依赖漏洞（CVE / Trivy）")
+lines.append("")
+lines.append("| 包 | 漏洞ID | 严重级别 |")
+lines.append("|----|--------|----------|")
+vuln_rows = []
+for item in vulns[:30]:
+    pkg = row_loc(item, "PkgName", "PkgID", "Package")
+    vid = row_loc(item, "VulnerabilityID", "PrimaryURL", "Title")
+    sev = row_loc(item, "Severity")
+    vuln_rows.append(f"| `{pkg}` | `{vid}` | {sev} |")
+if vuln_rows:
+    lines.extend(vuln_rows)
+else:
+    lines.append("| 无 | - | - |")
+lines.append("")
+
+lines.append("## ⚙️ 配置风险（Trivy Config）")
+lines.append("")
+lines.append("| 目标 | 规则 | 严重级别 |")
+lines.append("|------|------|----------|")
+cfg_rows = []
+for item in misconfigs[:20]:
+    target_file = row_loc(item, "Target", "File", "Namespace")
+    rid = row_loc(item, "ID", "AVDID", "Title")
+    sev = row_loc(item, "Severity")
+    cfg_rows.append(f"| `{target_file}` | `{rid}` | {sev} |")
+if cfg_rows:
+    lines.extend(cfg_rows)
+else:
+    lines.append("| 无 | - | - |")
+lines.append("")
+
+lines.append("## 修复优先级建议")
+lines.append("")
+lines.append("### 立即处理（24小时内）")
+lines.append("1. 处理 Critical 级别的代码漏洞与密钥泄漏。")
+lines.append("2. 对存在利用路径的 High 级依赖漏洞优先升级或打补丁。")
+lines.append("")
+lines.append("### 近期处理（本迭代）")
+lines.append("1. 清理 High 级配置风险与历史泄漏凭据。")
+lines.append("2. 为高风险模块补充测试和回归校验。")
+lines.append("")
+lines.append("### 计划处理")
+lines.append("1. 引入 CI 里的持续扫描（bearer/trivy/gitleaks）。")
+lines.append("2. 为敏感目录建立提交前 secret 检查策略。")
+lines.append("")
+lines.append("## 原始扫描数据")
+lines.append("")
+lines.append(f"- bearer: `{bearer_path}`")
+lines.append(f"- trivy: `{trivy_path}`")
+lines.append(f"- gitleaks: `{gitleaks_path}`")
+
+report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+print(f"WROTE={report}")
+PY
+
+echo "📄 demon: report generated at $REPORT"

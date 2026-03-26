@@ -10,6 +10,7 @@ set -euo pipefail
 
 TARGET="${1:-.}"
 OUT="${2:-$TARGET/.judge-the-code/skill-review-findings.json}"
+TARGET_ABS="$(cd "$TARGET" && pwd)"
 
 if [ ! -d "$TARGET" ]; then
   echo "error: target is not a directory: $TARGET" >&2
@@ -34,10 +35,23 @@ fi
 add_finding() {
   # rule | severity | file | line | message | suggestion
   local line="$4"
+  local file="$3"
   if ! [[ "$line" =~ ^[0-9]+$ ]]; then
     line="1"
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$line" "$5" "$6" >> "$TMP"
+  if [ -n "$file" ] && [ -e "$file" ]; then
+    file="$(python3 - "$TARGET_ABS" "$file" <<'PY'
+import os, sys
+target = os.path.abspath(sys.argv[1])
+path = os.path.abspath(sys.argv[2])
+try:
+    print(os.path.relpath(path, target))
+except Exception:
+    print(path)
+PY
+)"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$file" "$line" "$5" "$6" >> "$TMP"
 }
 
 has_pattern_any() {

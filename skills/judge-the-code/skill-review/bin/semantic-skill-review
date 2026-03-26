@@ -42,10 +42,14 @@ files.sort()
 findings = []
 
 def add(rule, severity, file, line, message, suggestion, dimension):
+    try:
+        file_display = str(Path(file).resolve().relative_to(target))
+    except Exception:
+        file_display = str(file)
     findings.append({
         "rule": rule,
         "severity": severity,
-        "file": str(file),
+        "file": file_display,
         "line": int(line) if isinstance(line, int) or str(line).isdigit() else 1,
         "message": message,
         "suggestion": suggestion,

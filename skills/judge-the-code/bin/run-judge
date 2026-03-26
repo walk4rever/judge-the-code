@@ -3,9 +3,11 @@ set -euo pipefail
 
 # run-judge
 # Unified entrypoint for mixed repositories.
+# Prefer invoking via the stable wrapper name: judge-the-code [target-dir]
 # Outputs are centralized in TARGET/.judge-the-code (including skill results).
 #
 # Usage:
+#   judge-the-code [target-dir]
 #   run-judge [target-dir]
 
 TARGET="${1:-.}"
@@ -14,6 +16,7 @@ SUITE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL_REVIEW_DIR="$SUITE_DIR/skill-review"
 DETECT="$SCRIPT_DIR/detect-project-type"
 RUN_CODE="$SCRIPT_DIR/run-code-pipeline"
+RUN_DEMON="$SCRIPT_DIR/run-demon-hunter"
 LINT="$SKILL_REVIEW_DIR/bin/lint-skill-review"
 SEM="$SKILL_REVIEW_DIR/bin/semantic-skill-review"
 GEN="$SKILL_REVIEW_DIR/bin/generate-skill-review-report"
@@ -23,7 +26,8 @@ VIEW_BIN="$SUITE_DIR/bin/view"
 
 OUT_DIR="$TARGET/.judge-the-code"
 PROFILE="$OUT_DIR/project-profile.json"
-SUMMARY="$OUT_DIR/judge-summary.md"
+SUMMARY="$OUT_DIR/summary.md"
+LEGACY_SUMMARY="$OUT_DIR/judge-summary.md"
 SKILL_STATE_DIR="$OUT_DIR/skills"
 AGG_FINDINGS="$OUT_DIR/skill-review-findings.json"
 AGG_SEMANTIC="$OUT_DIR/skill-review-semantic.json"
@@ -35,7 +39,7 @@ if [ ! -d "$TARGET" ]; then
   exit 1
 fi
 
-for cmd in "$DETECT" "$RUN_CODE" "$LINT" "$SEM" "$GEN" "$HISTORY"; do
+for cmd in "$DETECT" "$RUN_CODE" "$RUN_DEMON" "$LINT" "$SEM" "$GEN" "$HISTORY"; do
   if [ ! -x "$cmd" ]; then
     echo "error: missing executable: $cmd" >&2
     exit 1
@@ -102,17 +106,13 @@ PY
 )"
 
 RUN_TS="$(date '+%Y-%m-%d %H:%M')"
-{
-  echo "# judge-the-code — Unified Summary"
-  echo ""
-  echo "> Generated: $RUN_TS"
-  echo "> Target: $TARGET"
-  echo "> Project type: $PROJECT_TYPE"
-  echo ""
-} > "$SUMMARY"
-
 MANIFEST="$OUT_DIR/skill-review-manifest.tsv"
 : > "$MANIFEST"
+TARGET_ABS="$(python3 - "$TARGET" <<'PY'
+import os, sys
+print(os.path.abspath(sys.argv[1]))
+PY
+)"
 
 if [ "$PROJECT_TYPE" = "skill_only" ] || [ "$PROJECT_TYPE" = "hybrid" ]; then
   echo "🧠 judge: running skill-review (centralized output)"
@@ -132,10 +132,20 @@ if [ "$PROJECT_TYPE" = "skill_only" ] || [ "$PROJECT_TYPE" = "hybrid" ]; then
     "$SEM" "$root" "$s"
     "$GEN" "$root" "$f" "$r" "$s"
     printf '%s\t%s\t%s\t%s\t%s\n' "$root" "$slug" "$r" "$f" "$s" >> "$MANIFEST"
-    echo "- skill-review analyzed: $root" >> "$SUMMARY"
+    root_display="$(python3 - "$TARGET_ABS" "$root" <<'PY'
+import os, sys
+target = os.path.abspath(sys.argv[1])
+root = os.path.abspath(sys.argv[2])
+try:
+    rel = os.path.relpath(root, target)
+except Exception:
+    rel = root
+print(rel if rel != "." else ".")
+PY
+)"
   done <<< "$SKILL_ROOTS"
 
-  python3 - "$MANIFEST" "$AGG_FINDINGS" "$AGG_SEMANTIC" "$AGG_BREAKDOWN" <<'PY'
+  python3 - "$MANIFEST" "$AGG_FINDINGS" "$AGG_SEMANTIC" "$AGG_BREAKDOWN" "$TARGET_ABS" <<'PY'
 import json
 import re
 import sys
@@ -145,6 +155,7 @@ manifest = Path(sys.argv[1])
 agg_find = Path(sys.argv[2])
 agg_sem = Path(sys.argv[3])
 breakdown = Path(sys.argv[4])
+target_root = Path(sys.argv[5]).resolve()
 
 rows = []
 for line in manifest.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -166,6 +177,14 @@ md_lines = []
 md_lines.append("| Skill Root | Score | Grade | Critical | High | Medium | Low |")
 md_lines.append("|------------|-------|-------|----------|------|--------|-----|")
 
+def display_path(path_str):
+    try:
+        path = Path(path_str).resolve()
+        rel = path.relative_to(target_root)
+        return "." if str(rel) == "." else str(rel)
+    except Exception:
+        return path_str
+
 for row in rows:
     score = "NA"
     grade = "NA"
@@ -182,7 +201,7 @@ for row in rows:
         obj = json.loads(row["findings"].read_text(encoding="utf-8", errors="ignore"))
         for f in obj.get("findings", []):
             ff = dict(f)
-            ff["skill_root"] = row["root"]
+            ff["skill_root"] = display_path(row["root"])
             all_findings.append(ff)
             sev = str(ff.get("severity", "")).lower()
             if sev in counts:
@@ -192,7 +211,7 @@ for row in rows:
         obj = json.loads(row["semantic"].read_text(encoding="utf-8", errors="ignore"))
         for f in obj.get("findings", []):
             ff = dict(f)
-            ff["skill_root"] = row["root"]
+            ff["skill_root"] = display_path(row["root"])
             all_sem_findings.append(ff)
         for d in obj.get("dimensions", []):
             n = d.get("name")
@@ -202,7 +221,7 @@ for row in rows:
             sem_dim_samples.setdefault(n, []).append(s)
 
     md_lines.append(
-        f"| `{row['root']}` | {score} | {grade} | {counts['critical']} | {counts['high']} | {counts['medium']} | {counts['low']} |"
+        f"| `{display_path(row['root'])}` | {score} | {grade} | {counts['critical']} | {counts['high']} | {counts['medium']} | {counts['low']} |"
     )
 
 agg_find.parent.mkdir(parents=True, exist_ok=True)
@@ -237,18 +256,13 @@ PY
   "$HISTORY" "$TARGET" "$AGG_REPORT" "$AGG_FINDINGS"
 else
   echo "ℹ️  judge: no skill roots detected, skip skill-review"
-  echo "- skill-review: skipped (no skill signals)" >> "$SUMMARY"
 fi
 
 if [ "$PROJECT_TYPE" = "code_only" ] || [ "$PROJECT_TYPE" = "hybrid" ]; then
-  echo "🧩 judge: running code pipeline (default full baseline)"
-  "$RUN_CODE" "$TARGET"
-  {
-    echo ""
-    echo "## Code Pipeline"
-    echo "- Deterministic full baseline generated (code-explore/design-lens/demon-hunter/token-optimize if missing)."
-    echo "- For semantic depth, run code-explore/design-lens/demon-hunter explicitly."
-  } >> "$SUMMARY"
+  echo "🧩 judge: running code pipeline (forced refresh)"
+  "$RUN_CODE" "$TARGET" --force
+  echo "👹 judge: running demon-hunter full scan"
+  "$RUN_DEMON" "$TARGET"
 fi
 
 ensure_view_binary
@@ -257,11 +271,133 @@ if [ -x "$VIEW_BIN" ]; then
   "$VIEW_BIN" "$TARGET" >/dev/null 2>&1 || true
 fi
 
-echo ""
-echo "## Next Actions" >> "$SUMMARY"
-echo "1. Open root dashboard: $OUT_DIR/dashboard.html" >> "$SUMMARY"
-echo "2. For deeper semantic analysis, run code-explore/design-lens/demon-hunter/token-optimize explicitly." >> "$SUMMARY"
+python3 - "$TARGET" "$SUMMARY" "$PROFILE" "$RUN_TS" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+target = Path(sys.argv[1]).resolve()
+summary_path = Path(sys.argv[2])
+profile_path = Path(sys.argv[3])
+run_ts = sys.argv[4]
+out_dir = target / ".judge-the-code"
+
+profile = json.loads(profile_path.read_text(encoding="utf-8", errors="ignore"))
+project_type = profile.get("project_type", "unknown")
+skill_roots = profile.get("skill_roots", [])
+
+report_files = {
+    "code-explore": out_dir / "code-explore.md",
+    "design-lens": out_dir / "design-lens.md",
+    "demon-hunter": out_dir / "demon-hunter.md",
+    "token-optimize": out_dir / "token-optimize.md",
+    "skill-review": out_dir / "skill-review.md",
+}
+
+def exists(name):
+    return report_files[name].exists()
+
+def rel(path: Path):
+    try:
+        return str(path.resolve().relative_to(target))
+    except Exception:
+        return str(path)
+
+def read_text(path: Path):
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8", errors="ignore")
+
+skill_review_text = read_text(report_files["skill-review"])
+demon_text = read_text(report_files["demon-hunter"])
+
+score = grade = None
+m = re.search(r"综合评分\s*[:：]\s*(\d+)", skill_review_text)
+if m:
+    score = m.group(1)
+m = re.search(r"等级\s*[:：]\s*([A-D][+-]?)", skill_review_text)
+if m:
+    grade = m.group(1)
+
+risk_critical = risk_high = None
+m = re.search(r"\|\s*🔴 Critical\s*\|\s*(\d+)\s*\|", demon_text)
+if m:
+    risk_critical = m.group(1)
+m = re.search(r"\|\s*🟠 High\s*\|\s*(\d+)\s*\|", demon_text)
+if m:
+    risk_high = m.group(1)
+
+status_lines = []
+for name in ["code-explore", "design-lens", "demon-hunter", "token-optimize", "skill-review"]:
+    marker = "generated" if exists(name) else "not generated"
+    status_lines.append(f"| `{name}` | {marker} | `{rel(report_files[name])}` |")
+
+highlights = []
+if project_type in {"skill_only", "hybrid"}:
+    if score and grade:
+        highlights.append(f"- Skill review overall score: {score} ({grade})")
+    elif skill_roots:
+        highlights.append(f"- Skill review covered {len(skill_roots)} skill root(s)")
+if project_type in {"code_only", "hybrid"}:
+    if risk_critical is not None and risk_high is not None:
+        highlights.append(f"- Security scan found {risk_critical} critical and {risk_high} high-risk items")
+    highlights.append("- Code baseline reports were refreshed for structure, design, and token review")
+if not highlights:
+    highlights.append("- No major analysis results were extracted")
+
+next_steps = []
+if exists("demon-hunter"):
+    next_steps.append(f"1. Start with `{rel(report_files['demon-hunter'])}` for the highest-risk findings.")
+if exists("skill-review"):
+    next_steps.append(f"2. Review `{rel(report_files['skill-review'])}` for skill/prompt quality issues.")
+if exists("design-lens"):
+    next_steps.append(f"3. Read `{rel(report_files['design-lens'])}` for architectural and design takeaways.")
+if (out_dir / "summary.html").exists():
+    idx = len(next_steps) + 1
+    next_steps.append(f"{idx}. Open `{rel(out_dir / 'summary.html')}` for the dashboard view.")
+if not next_steps:
+    next_steps.append("1. Open the generated reports under `.judge-the-code/`.")
+
+lines = []
+lines.append("# judge-the-code — Summary")
+lines.append("")
+lines.append(f"> Generated: {run_ts}")
+lines.append(f"> Target: {target.name}")
+lines.append(f"> Project type: {project_type}")
+lines.append("")
+lines.append("## Overview")
+if project_type == "hybrid":
+    lines.append("- This target contains both code and skill/prompt signals, so judge-the-code ran both paths.")
+elif project_type == "code_only":
+    lines.append("- This target looks like a code repository, so judge-the-code ran the code analysis path.")
+elif project_type == "skill_only":
+    lines.append("- This target looks like a skill/prompt project, so judge-the-code ran skill-review.")
+else:
+    lines.append("- Project type detection was inconclusive; review generated artifacts directly.")
+if skill_roots:
+    lines.append(f"- Skill roots detected: {', '.join('`' + rel(Path(p)) + '`' for p in skill_roots)}")
+lines.append("")
+lines.append("## Key Results")
+lines.extend(highlights)
+lines.append("")
+lines.append("## Reports")
+lines.append("| Report | Status | File |")
+lines.append("|--------|--------|------|")
+lines.extend(status_lines)
+lines.append("")
+lines.append("## Recommended Reading Order")
+lines.extend(next_steps)
+lines.append("")
+lines.append("## Output Directory")
+lines.append(f"- All artifacts for this run are under `{rel(out_dir)}`.")
+
+summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+
+rm -f "$LEGACY_SUMMARY"
 
 echo "DONE"
+echo "  command: $SUITE_DIR/bin/judge-the-code $TARGET"
 echo "  profile: $PROFILE"
 echo "  summary: $SUMMARY"

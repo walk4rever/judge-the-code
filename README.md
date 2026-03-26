@@ -99,48 +99,75 @@ As the AI Agent ecosystem grows, more and more projects are not traditional sour
 
 ---
 
-## Usage
-
-```bash
-/code-explore .       # Step 1: understand the codebase structure
-/design-lens .        # Step 2: extract design philosophy
-/demon-hunter .       # Step 3: hunt for demons
-/token-optimize .     # Step 4: find token waste
-/skill-review .       # Skill/Prompt path: review prompt-engineering projects
-
-view .                # Open dashboard in browser
-
-# One-command deterministic skill-review (report + history + dashboard)
-~/.agents/skills/judge-the-code/skill-review/bin/run-skill-review .
-
-# Unified mixed-repo entrypoint (auto-detect code/skill/hybrid)
-~/.agents/skills/judge-the-code/bin/run-judge .
-# - hybrid/skill: runs skill-review automatically
-# - hybrid/code:  default full baseline (code-explore/design-lens/demon-hunter/token-optimize)
-# - all outputs are centralized at TARGET/.judge-the-code/
-```
-
----
-
 ## Installation
 
-```bash
-# 1. Copy the skill
-cp -r skills/judge-the-code ~/.agents/skills/
-
-# 2. One-time setup (builds dashboard binary + downloads scan tools)
-~/.agents/skills/judge-the-code/setup
-```
-
-> ⚠️ **Upgrading**: re-run `cp` after each update to overwrite the installed version.
-
-## Dashboard
+Place the `judge-the-code` directory wherever your agent loads skills from, then run setup inside that directory.
 
 ```bash
-~/.agents/skills/judge-the-code/bin/view .
+cd /path/to/judge-the-code
+./setup
 ```
 
-Generates `.judge-the-code/dashboard.html` and opens it in your browser. Renders Mermaid architecture diagrams, color-coded design decisions, and severity-graded security findings.
+`setup` is in-place: it prepares tools for the current `judge-the-code` directory only.
+It does not copy files into any global skills path for you.
+
+> Upgrading: replace this directory with the new version, then run `./setup` again.
+
+## Usage
+
+Use a single entrypoint by default:
+
+```bash
+/judge-the-code .
+/judge-the-code /path/to/project
+```
+
+The root skill routes automatically:
+
+- code repo: `code-explore -> design-lens -> demon-hunter -> token-optimize`
+- skill/prompt repo: `skill-review`
+- hybrid repo: auto-detects and chooses the appropriate path
+
+Natural-language requests should map to the same root skill, for example:
+
+- "Review this repo end-to-end"
+- "Help me understand this codebase and find risks"
+- "Audit this AI-generated project"
+- "Check this skill project for prompt and orchestration issues"
+
+### Advanced Usage
+
+Use sub-skills directly only when you want one focused slice:
+
+```bash
+/code-explore .       # Structure and onboarding
+/design-lens .        # Design philosophy
+/demon-hunter .       # Security and hazard scan
+/token-optimize .     # LLM/token efficiency review
+/skill-review .       # Skill/prompt engineering review
+```
+
+### Deterministic CLI Entrypoint
+
+```bash
+./bin/judge-the-code .
+```
+
+`judge-the-code` is the non-chat unified entrypoint for mixed repositories:
+
+- hybrid/skill: runs `skill-review`
+- hybrid/code: runs the full baseline
+- all outputs are centralized at `TARGET/.judge-the-code/`
+
+`run-judge` remains as the underlying implementation script for compatibility.
+
+### Dashboard
+
+```bash
+./bin/view .
+```
+
+Generates `.judge-the-code/summary.html` and opens it in your browser.
 
 ### Output files
 
@@ -151,7 +178,7 @@ Generates `.judge-the-code/dashboard.html` and opens it in your browser. Renders
 ├── demon-hunter.md     ← demon-hunter report
 ├── token-optimize.md   ← token-optimize report
 ├── skill-review.md     ← skill-review report
-├── dashboard.html      ← visual dashboard
+├── summary.html        ← visual summary
 └── state/              ← internal skill state (ignore this)
 ```
 
